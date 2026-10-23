@@ -18,7 +18,7 @@ namespace openfeslhook::log
 		Error,
 	};
 
-	/// What a log line is about; each topic has a tag in the log.
+	/// What a log line is about; each topic has a tag in the log and a colour of its own in the console.
 	enum class Topic
 	{
 		/// The hook's start, its settings and its log.

@@ -5,4 +5,5 @@ BEGIN
 	IDS_DIALOG_CAPTION "OpenFESLHook"
 	IDS_START_PROBLEMS "OpenFESLHook found problems while starting and runs on as each line describes:"
 	IDS_START_FAILED "OpenFESLHook could not start, so the game runs without it:"
+	IDS_LOG_HINT "Console=1 or File=1 in the [Log] section of OpenFESLHook.ini shows these lines in the hook's log."
 END

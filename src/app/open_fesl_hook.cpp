@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "open_fesl_hook.hpp"
 
+#include "app/log_output.hpp"
 #include "app/settings.hpp"
 #include "http/masking.hpp"
 #include "logging/log.hpp"
@@ -63,6 +64,7 @@ namespace openfeslhook::app
 			std::wstring text = loadString(library, lead);
 			for (const std::string& problem : problems)
 				text += L"\n\n" + platform::widen(problem);
+			text += L"\n\n" + loadString(library, IDS_LOG_HINT);
 			MessageBoxW(nullptr, text.c_str(), loadString(library, IDS_DIALOG_CAPTION).c_str(),
 			            MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
 		}
@@ -84,11 +86,15 @@ namespace openfeslhook::app
 			const config::Settings settings = loadSettings(file);
 			for (const std::string& problem : settings.problems)
 				problems.push_back(std::format("OpenFESLHook.ini, {}", problem));
+			LogOutputs outputs = openLog(settings.log, folder);
+			std::ranges::move(outputs.problems, std::back_inserter(problems));
 
 			log::info(log::Topic::Hook,
 			          "OpenFESLHook {} by Marek Grzyb (@GrzybDev), https://github.com/GrzybDev/OpenFESLHook", kVersion);
 			log::info(log::Topic::Hook, "Running in {}, process {}",
 			          platform::narrow(modulePath(nullptr).filename().wstring()), GetCurrentProcessId());
+			if (outputs.file)
+				log::info(log::Topic::Hook, "The log file is {}", platform::narrow(outputs.file->wstring()));
 			if (std::error_code error; std::filesystem::exists(file, error))
 				log::info(log::Topic::Hook, "Reading the settings from {}", platform::narrow(file.wstring()));
 			else
@@ -113,12 +119,15 @@ namespace openfeslhook::app
 		catch (const std::exception& problem)
 		{
 			log::error(log::Topic::Hook, "The hook could not start: {}", problem.what());
-			// The log has no output, but a debugger sees this.
+			// A debugger sees this whatever the log does.
 			OutputDebugStringA(std::format("OpenFESLHook could not start: {}\n", problem.what()).c_str());
 			failure = problem.what();
 		}
 
-		// This thread has nothing left to do, so the dialog holds up neither the hook nor the game.
+		// Only a hook without any log output shows a dialog, since an output that is open holds the same lines. This
+		// thread has nothing left to do, so the dialog holds up neither the hook nor the game.
+		if (log::enabled(log::Level::Error))
+			return;
 		if (failure)
 		{
 			problems.insert(problems.begin(), *failure);

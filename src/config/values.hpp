@@ -8,6 +8,7 @@
 
 #include <boost/algorithm/string/case_conv.hpp>
 
+#include "logging/log.hpp"
 #include "net/service.hpp"
 
 namespace openfeslhook::config
@@ -21,6 +22,11 @@ namespace openfeslhook::config
 	/// @param text The key.
 	/// @throws std::invalid_argument When the key is neither.
 	[[nodiscard]] std::string parseHostPattern(std::string_view text);
+
+	/// Reads a log level by its name: trace, debug, info, warning or error.
+	/// @param text The value.
+	/// @throws std::invalid_argument When the value names no level.
+	[[nodiscard]] log::Level parseLevel(std::string_view text);
 
 	/// Reads a switch: 1, true, yes or on, or 0, false, no or off.
 	/// @param text The value.

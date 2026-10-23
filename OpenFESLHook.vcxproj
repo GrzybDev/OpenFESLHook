@@ -55,6 +55,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\app\log_output.hpp" />
     <ClInclude Include="src\app\open_fesl_hook.hpp" />
     <ClInclude Include="src\app\settings.hpp" />
     <ClInclude Include="src\platform\host_redirect.hpp" />
@@ -66,6 +67,7 @@
     <ClInclude Include="src\version.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\app\log_output.cpp" />
     <ClCompile Include="src\app\open_fesl_hook.cpp" />
     <ClCompile Include="src\app\settings.cpp" />
     <ClCompile Include="src\direct_input.cpp" />

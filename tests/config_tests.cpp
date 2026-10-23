@@ -28,9 +28,11 @@ namespace openfeslhook::test
 
 	TEST(Settings, ReadsTheFirstSectionOfAFileSavedWithAByteOrderMark)
 	{
-		const config::Settings settings = parse("\xEF\xBB\xBF[Server]\r\nUrl=ws://127.0.0.1:8000\r\n");
+		const config::Settings settings =
+			parse("\xEF\xBB\xBF[Server]\r\nUrl=ws://127.0.0.1:8000\r\n\r\n[Log]\r\nConsole=yes\r\n");
 
 		EXPECT_EQ(settings.server, relay::parseServerAddress("ws://127.0.0.1:8000"));
+		EXPECT_TRUE(settings.log.console);
 		EXPECT_TRUE(settings.problems.empty());
 	}
 
@@ -47,6 +49,11 @@ BlockUnknownHosts=maybe
 # *.theater.example.test=theater
 *.theater.example.test:18395=theater
 easo.example.test=ssl
+[log]
+file=yes
+ConsoleColors=off
+FileLevl=trace
+Path=logi\zażółć.log
 [Logs]
 Console=1
 )");
@@ -55,10 +62,15 @@ Console=1
 		EXPECT_TRUE(settings.blockUnknownHosts);
 		EXPECT_EQ(settings.hosts.entries().size(), 1u);
 		EXPECT_EQ(settings.hosts.find("pc.fesl.example.test"), net::Protocol::Fesl);
+		EXPECT_TRUE(settings.log.file);
+		EXPECT_FALSE(settings.log.console);
+		EXPECT_FALSE(settings.log.consoleColors);
+		EXPECT_EQ(settings.log.fileLevel, log::Level::Debug);
+		EXPECT_EQ(settings.log.path, std::filesystem::path(u8"logi\\zażółć.log"));
 
-		EXPECT_EQ(settings.problems.size(), 5u);
+		EXPECT_EQ(settings.problems.size(), 6u);
 		for (const std::string_view line : {"Log.Console", "BlockUnknownHosts", "*.theater.example.test:18395",
-		                                    "easo.example.test", "[Logs]"})
+		                                    "easo.example.test", "FileLevl", "[Logs]"})
 			EXPECT_TRUE(mentions(settings.problems, line)) << line;
 	}
 
@@ -69,8 +81,8 @@ Console=1
 		EXPECT_EQ(missing.hosts.find("bfbc2-pc.fesl.ea.com"), net::Protocol::Fesl);
 		EXPECT_TRUE(missing.problems.empty());
 
-		const config::Settings repeated = parse("[Redirect]\nBlockUnknownHosts=0\nblockunknownhosts=0\n");
-		EXPECT_TRUE(repeated.blockUnknownHosts);
+		const config::Settings repeated = parse("[Log]\nConsole=1\nconsole=0\n");
+		EXPECT_FALSE(repeated.log.console);
 		EXPECT_EQ(repeated.hosts.find("bfbc2-pc.theater.ea.com"), net::Protocol::Theater);
 		ASSERT_EQ(repeated.problems.size(), 1u);
 		EXPECT_TRUE(repeated.problems.front().starts_with("line 3:")) << repeated.problems.front();
@@ -81,13 +93,15 @@ Console=1
 		EXPECT_EQ(unusable.problems.size(), 2u);
 	}
 
-	TEST(ConfigValues, ReadsSwitches)
+	TEST(ConfigValues, ReadsLevelsAndSwitches)
 	{
+		EXPECT_EQ(config::parseLevel("Warning"), log::Level::Warning);
 		for (const std::string_view on : {"1", "true", "Yes", "ON"})
 			EXPECT_TRUE(config::parseFlag(on)) << on;
 		for (const std::string_view off : {"0", "False", "no", "off"})
 			EXPECT_FALSE(config::parseFlag(off)) << off;
 
+		EXPECT_THROW((void)config::parseLevel("loud"), std::invalid_argument);
 		EXPECT_THROW((void)config::parseFlag("enabled"), std::invalid_argument);
 	}
 

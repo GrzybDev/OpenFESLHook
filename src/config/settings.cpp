@@ -28,6 +28,11 @@ namespace openfeslhook::config
 			return quoted ? text.substr(1, text.size() - 2) : text;
 		}
 
+		std::filesystem::path parsePath(const std::string_view text)
+		{
+			return std::filesystem::path(std::u8string(text.begin(), text.end()));
+		}
+
 		// Takes values out of the file's sections, noting each line it takes so that the others can be reported.
 		class Reader
 		{
@@ -174,6 +179,12 @@ namespace openfeslhook::config
 				settings.hosts.add(host, protocol);
 		}
 
+		reader.read("Log", "Console", settings.log.console, parseFlag);
+		reader.read("Log", "File", settings.log.file, parseFlag);
+		reader.read("Log", "ConsoleLevel", settings.log.consoleLevel, parseLevel);
+		reader.read("Log", "ConsoleColors", settings.log.consoleColors, parseFlag);
+		reader.read("Log", "FileLevel", settings.log.fileLevel, parseLevel);
+		reader.read("Log", "Path", settings.log.path, parsePath);
 		reader.reportUntaken();
 		return settings;
 	}

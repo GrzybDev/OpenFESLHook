@@ -41,6 +41,20 @@ namespace openfeslhook::config
 		return std::string(text);
 	}
 
+	log::Level parseLevel(const std::string_view text)
+	{
+		constexpr std::array<std::pair<std::string_view, log::Level>, 5> kLevels{{
+			{"trace", log::Level::Trace},
+			{"debug", log::Level::Debug},
+			{"info", log::Level::Info},
+			{"warning", log::Level::Warning},
+			{"error", log::Level::Error},
+		}};
+		if (const std::optional<log::Level> level = named(kLevels, text))
+			return *level;
+		throw std::invalid_argument(std::format("\"{}\" is not trace, debug, info, warning or error", text));
+	}
+
 	bool parseFlag(const std::string_view text)
 	{
 		constexpr std::array<std::pair<std::string_view, bool>, 8> kFlags{{
