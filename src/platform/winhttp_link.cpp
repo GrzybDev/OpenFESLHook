@@ -42,7 +42,7 @@ namespace openfeslhook::platform
 		// Set once the end of the connection was reported, or was not to be.
 		bool ended = false;
 		bool sending = false;
-		bool shutDown = false;
+		bool closingWebSocket = false;
 		// Whether the look-ups for the request being sent asked for IPv4 addresses only.
 		bool overIpv4 = false;
 		// Why sending over IPv4 failed, while the request is sent again over every address family.
@@ -183,10 +183,12 @@ namespace openfeslhook::platform
 				}
 				sendNext();
 				break;
-			case WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE:
+			case WINHTTP_CALLBACK_STATUS_CLOSE_COMPLETE:
 				closeHandles();
 				break;
 			case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
+				// Closing the WebSocket cancels the receive under way, which must not close the handles before the
+				// closing handshake ends.
 				if (const auto& result = *static_cast<WINHTTP_ASYNC_RESULT*>(information);
 				    result.dwResult == API_SEND_REQUEST)
 					sendFailed(result.dwError, "the connection failed");
@@ -370,7 +372,7 @@ namespace openfeslhook::platform
 					report(text.empty() ? std::format("the relay server closed it with code {}", code)
 					                    : std::format("the relay server closed it with code {}: {}", code, text));
 					// The closing handshake wants the close answered with one.
-					shutDownOrClose();
+					closeWebSocket();
 				}
 				break;
 			default:
@@ -383,13 +385,13 @@ namespace openfeslhook::platform
 		{
 			HINTERNET webSocket = nullptr;
 			std::vector<std::uint8_t>* message = nullptr;
-			bool shutDownNow = false;
+			bool closeNow = false;
 			{
 				const std::scoped_lock lock(mutex);
 				if (sending || closingHandles || !socket)
 					return;
 				if (stopped)
-					shutDownNow = true;
+					closeNow = true;
 				else if (!outgoing.empty())
 				{
 					sending = true;
@@ -398,9 +400,9 @@ namespace openfeslhook::platform
 					++callsUnderWay;
 				}
 			}
-			if (shutDownNow)
+			if (closeNow)
 			{
-				shutDownOrClose();
+				closeWebSocket();
 				return;
 			}
 			if (!message)
@@ -413,15 +415,17 @@ namespace openfeslhook::platform
 				fail(std::format("sending failed: {}", errorText(error)));
 		}
 
-		// A send under way has to finish before the close frame goes out.
-		void shutDownOrClose()
+		// WinHTTP refuses to close while a send is under way, so that send finishes first. Closing sends the close
+		// frame, or answers the server's, and completes once the server's answer arrives or WinHTTP's close timeout of
+		// ten seconds runs out, so the handles never close while the server's close frame is on its way.
+		void closeWebSocket()
 		{
 			HINTERNET webSocket = nullptr;
 			{
 				const std::scoped_lock lock(mutex);
-				if (sending || shutDown)
+				if (sending || closingWebSocket)
 					return;
-				shutDown = true;
+				closingWebSocket = true;
 				if (socket && !closingHandles)
 				{
 					webSocket = socket;
@@ -434,8 +438,7 @@ namespace openfeslhook::platform
 				return;
 			}
 
-			const DWORD error =
-				WinHttpWebSocketShutdown(webSocket, WINHTTP_WEB_SOCKET_SUCCESS_CLOSE_STATUS, nullptr, 0);
+			const DWORD error = WinHttpWebSocketClose(webSocket, WINHTTP_WEB_SOCKET_SUCCESS_CLOSE_STATUS, nullptr, 0);
 			leave();
 			if (!started(error))
 				closeHandles();
