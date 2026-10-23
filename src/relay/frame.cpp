@@ -97,4 +97,17 @@ namespace openfeslhook::relay
 		return frame;
 	}
 
+	std::string_view channelName(const Channel channel)
+	{
+		switch (channel)
+		{
+		case Channel::Fesl:
+			return "FESL";
+		case Channel::Theater:
+			return "Theater";
+		case Channel::TheaterDatagram:
+			return "Theater datagram";
+		}
+		return "unknown";
+	}
 }

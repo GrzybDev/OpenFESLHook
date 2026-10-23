@@ -87,4 +87,8 @@ namespace openfeslhook::relay
 	/// @param message The message's bytes.
 	/// @throws std::runtime_error When the message is not a frame of this protocol.
 	[[nodiscard]] Frame decode(std::span<const std::uint8_t> message);
+
+	/// Names a channel for the log.
+	/// @param channel The channel.
+	[[nodiscard]] std::string_view channelName(Channel channel);
 }

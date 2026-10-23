@@ -44,15 +44,22 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\fesl\packet.hpp" />
+    <ClInclude Include="src\logging\log.hpp" />
     <ClInclude Include="src\pch.hpp" />
     <ClInclude Include="src\relay\frame.hpp" />
+    <ClInclude Include="src\relay\route.hpp" />
+    <ClInclude Include="src\relay\session.hpp" />
+    <ClInclude Include="src\relay\upstream.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\fesl\packet.cpp" />
+    <ClCompile Include="src\logging\log.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\relay\frame.cpp" />
+    <ClCompile Include="src\relay\route.cpp" />
+    <ClCompile Include="src\relay\session.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
