@@ -44,6 +44,7 @@
   <ItemGroup>
     <ClCompile Include="frame_tests.cpp" />
     <ClCompile Include="game_tls_tests.cpp" />
+    <ClCompile Include="local_services_tests.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="packet_tests.cpp" />
     <ClCompile Include="session_tests.cpp" />

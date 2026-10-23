@@ -1,8 +1,10 @@
 #include "support.hpp"
 
+#include <chrono>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include <boost/endian/conversion.hpp>
 #include <openssl/provider.h>
@@ -136,6 +138,18 @@ namespace openfeslhook::test
 	void FakeRelayServer::drop(const std::size_t connection, std::string reason) const
 	{
 		events(connection).closed(std::move(reason));
+	}
+
+	bool FakeRelayServer::waitUntil(const std::function<bool()>& condition) const
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		while (!condition())
+		{
+			if (std::chrono::steady_clock::now() > deadline)
+				return false;
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		}
+		return true;
 	}
 
 	relay::Upstream::Events FakeRelayServer::events(const std::size_t connection) const

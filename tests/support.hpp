@@ -1,12 +1,17 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include <boost/asio/cancel_after.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/read.hpp>
 #include <boost/asio/ssl/context.hpp>
 
 #include "fesl/packet.hpp"
@@ -24,6 +29,23 @@ namespace openfeslhook::test
 	/// Makes a TLS client context that speaks like the game's client: SSLv3 and the given RC4 suites only.
 	/// @param suites The OpenSSL names of the suites, most preferred first, separated by colons.
 	boost::asio::ssl::context gameClientContext(std::string_view suites);
+
+	/// Reads exactly as many bytes as the buffer holds, giving up after a few seconds so that a broken hook fails the
+	/// test instead of stalling it.
+	/// @param stream A stream whose executor belongs to an io_context nobody else runs, with no other work pending.
+	/// @param buffer Where the bytes go.
+	/// @return The read's error, or timed_out.
+	template <typename Stream>
+	boost::system::error_code readWithin(Stream& stream, const boost::asio::mutable_buffer buffer)
+	{
+		auto& io = static_cast<boost::asio::io_context&>(stream.get_executor().context());
+		boost::system::error_code result;
+		const auto read = [&result](const boost::system::error_code& error, std::size_t) { result = error; };
+		boost::asio::async_read(stream, buffer, boost::asio::cancel_after(std::chrono::seconds(5), read));
+		io.restart();
+		io.run();
+		return result == boost::asio::error::operation_aborted ? boost::asio::error::timed_out : result;
+	}
 
 	struct FakeRelayState;
 
@@ -61,6 +83,11 @@ namespace openfeslhook::test
 		/// @param connection The connection's index.
 		/// @param reason Why it was dropped.
 		void drop(std::size_t connection, std::string reason) const;
+
+		/// Waits until the condition holds, for a few seconds at most.
+		/// @param condition What to wait for.
+		/// @return Whether the condition holds.
+		bool waitUntil(const std::function<bool()>& condition) const;
 
 	private:
 		std::shared_ptr<FakeRelayState> state_;

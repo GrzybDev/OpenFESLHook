@@ -8,9 +8,11 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <format>
 #include <functional>
+#include <future>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -20,6 +22,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
