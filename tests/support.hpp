@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include <boost/asio/ssl/context.hpp>
+
 #include "fesl/packet.hpp"
 #include "relay/frame.hpp"
 #include "relay/upstream.hpp"
@@ -18,6 +20,10 @@ namespace openfeslhook::test
 	/// @param type The kind and transaction number.
 	/// @param payload The bytes after the header.
 	fesl::Packet makePacket(std::string_view command, std::uint32_t type, std::string_view payload);
+
+	/// Makes a TLS client context that speaks like the game's client: SSLv3 and the given RC4 suites only.
+	/// @param suites The OpenSSL names of the suites, most preferred first, separated by colons.
+	boost::asio::ssl::context gameClientContext(std::string_view suites);
 
 	struct FakeRelayState;
 

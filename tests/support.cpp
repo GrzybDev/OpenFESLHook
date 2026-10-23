@@ -1,9 +1,12 @@
 #include "support.hpp"
 
 #include <mutex>
+#include <stdexcept>
 #include <string>
 
 #include <boost/endian/conversion.hpp>
+#include <openssl/provider.h>
+#include <openssl/ssl.h>
 
 namespace openfeslhook::test
 {
@@ -62,6 +65,27 @@ namespace openfeslhook::test
 		boost::endian::store_big_u32(packet.data() + 8, static_cast<std::uint32_t>(fesl::kHeaderSize + payload.size()));
 		packet.insert(packet.end(), payload.begin(), payload.end());
 		return packet;
+	}
+
+	boost::asio::ssl::context gameClientContext(const std::string_view suites)
+	{
+		// The client needs RC4 from the legacy provider as much as the hook does, in a library context of its own.
+		static OSSL_LIB_CTX* const library = []
+		{
+			OSSL_LIB_CTX* context = OSSL_LIB_CTX_new();
+			if (!context || !OSSL_PROVIDER_load(context, "default") || !OSSL_PROVIDER_load(context, "legacy"))
+				throw std::runtime_error("OpenSSL could not load the providers of the game's client");
+			return context;
+		}();
+
+		SSL_CTX* const context = SSL_CTX_new_ex(library, nullptr, TLS_client_method());
+		boost::asio::ssl::context wrapped(context);
+		SSL_CTX_set_security_level(context, 0);
+		if (SSL_CTX_set_min_proto_version(context, SSL3_VERSION) != 1 ||
+		    SSL_CTX_set_max_proto_version(context, SSL3_VERSION) != 1 ||
+		    SSL_CTX_set_cipher_list(context, std::string(suites).c_str()) != 1)
+			throw std::runtime_error("OpenSSL could not set up the game's client");
+		return wrapped;
 	}
 
 	FakeRelayServer::FakeRelayServer() : state_(std::make_shared<FakeRelayState>())

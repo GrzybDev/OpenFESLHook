@@ -25,5 +25,14 @@
 
 // Boost.Asio includes the Winsock headers, which must come before windows.h.
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+
+#include <openssl/crypto.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/provider.h>
+#include <openssl/rand.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
 
 #include <windows.h>

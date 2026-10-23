@@ -4,6 +4,21 @@
     "boost-asio",
     "boost-beast",
     "boost-endian",
-    "gtest"
+    "gtest",
+    {
+      "name": "openssl",
+      "features": [
+        "ssl3",
+        "weak-ssl-ciphers"
+      ]
+    }
+  ],
+  "overrides": [
+    {
+      "$comment": "OpenSSL 4 removed SSLv3, the only protocol the game's TLS client speaks.",
+      "name": "openssl",
+      "version": "3.6.5",
+      "port-version": 2
+    }
   ]
 }
