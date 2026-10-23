@@ -4,15 +4,15 @@
 
 namespace
 {
-	DWORD WINAPI startHook(LPVOID /*parameter*/)
+	DWORD WINAPI startHook(LPVOID library)
 	{
-		openfeslhook::app::start();
+		openfeslhook::app::start(static_cast<HMODULE>(library));
 		return 0;
 	}
 }
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
-BOOL APIENTRY DllMain(HMODULE /*module*/, const DWORD reason, LPVOID /*reserved*/)
+BOOL APIENTRY DllMain(const HMODULE module, const DWORD reason, LPVOID /*reserved*/)
 {
 	// Thread notifications stay enabled, since the static CRT needs them.
 	if (reason != DLL_PROCESS_ATTACH)
@@ -20,7 +20,7 @@ BOOL APIENTRY DllMain(HMODULE /*module*/, const DWORD reason, LPVOID /*reserved*
 
 	// DllMain runs under the loader lock, so the hook starts on a thread of its own; the game looks up its servers
 	// only once it is running.
-	if (const HANDLE thread = CreateThread(nullptr, 0, startHook, nullptr, 0, nullptr))
+	if (const HANDLE thread = CreateThread(nullptr, 0, startHook, module, 0, nullptr))
 	{
 		CloseHandle(thread);
 		return TRUE;

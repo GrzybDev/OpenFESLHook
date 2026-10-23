@@ -32,7 +32,7 @@ namespace openfeslhook::net
 		auto operator<=>(const Service&) const = default;
 	};
 
-	/// Names a protocol for the log.
+	/// Names a protocol for the log and the configuration.
 	/// @param protocol The protocol.
 	[[nodiscard]] constexpr std::string_view protocolName(const Protocol protocol)
 	{

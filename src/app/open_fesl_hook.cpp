@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "open_fesl_hook.hpp"
 
-#include "config/values.hpp"
+#include "app/settings.hpp"
 #include "http/masking.hpp"
 #include "logging/log.hpp"
 #include "net/local_services.hpp"
@@ -10,20 +10,13 @@
 #include "platform/winhttp.hpp"
 #include "platform/winhttp_forwarder.hpp"
 #include "platform/winhttp_link.hpp"
+#include "resource.h"
 #include "version.hpp"
 
 namespace openfeslhook::app
 {
 	namespace
 	{
-		// The hosts FESL games share: each game has FESL and Theater names of its own below these domains, and fetches
-		// its files from this HTTP host.
-		const std::array<std::pair<std::string_view, net::Protocol>, 3> kGameHosts{{
-			{"*.fesl.ea.com", net::Protocol::Fesl},
-			{"*.theater.ea.com", net::Protocol::Theater},
-			{"easo.ea.com", net::Protocol::Http},
-		}};
-
 		std::filesystem::path modulePath(const HMODULE module)
 		{
 			std::wstring path(MAX_PATH, L'\0');
@@ -57,10 +50,28 @@ namespace openfeslhook::app
 					return std::make_shared<platform::WinHttpForwarder>(session, destination(server));
 				});
 		}
+
+		std::wstring loadString(const HMODULE library, const UINT id)
+		{
+			const wchar_t* text = nullptr;
+			const int length = LoadStringW(library, id, reinterpret_cast<wchar_t*>(&text), 0);
+			return length > 0 ? std::wstring(text, static_cast<std::size_t>(length)) : std::wstring();
+		}
+
+		void showProblems(const HMODULE library, const UINT lead, const std::vector<std::string>& problems)
+		{
+			std::wstring text = loadString(library, lead);
+			for (const std::string& problem : problems)
+				text += L"\n\n" + platform::widen(problem);
+			MessageBoxW(nullptr, text.c_str(), loadString(library, IDS_DIALOG_CAPTION).c_str(),
+			            MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+		}
 	}
 
-	void start() noexcept
+	void start(const HMODULE library) noexcept
 	{
+		std::vector<std::string> problems;
+		std::optional<std::string> failure;
 		try
 		{
 			// Starting Winsock is left to this thread, since Asio would otherwise start it under the loader lock.
@@ -68,28 +79,52 @@ namespace openfeslhook::app
 			if (const int error = WSAStartup(MAKEWORD(2, 2), &winsock); error != 0)
 				throw std::runtime_error(std::format("Winsock could not start (error {})", error));
 
+			const std::filesystem::path folder = modulePath(library).parent_path();
+			const std::filesystem::path file = folder / L"OpenFESLHook.ini";
+			const config::Settings settings = loadSettings(file);
+			for (const std::string& problem : settings.problems)
+				problems.push_back(std::format("OpenFESLHook.ini, {}", problem));
+
 			log::info(log::Topic::Hook,
 			          "OpenFESLHook {} by Marek Grzyb (@GrzybDev), https://github.com/GrzybDev/OpenFESLHook", kVersion);
 			log::info(log::Topic::Hook, "Running in {}, process {}",
 			          platform::narrow(modulePath(nullptr).filename().wstring()), GetCurrentProcessId());
-			config::HostMap<net::Protocol> hosts;
-			for (const auto& [host, protocol] : kGameHosts)
-				hosts.add(host, protocol);
+			if (std::error_code error; std::filesystem::exists(file, error))
+				log::info(log::Topic::Hook, "Reading the settings from {}", platform::narrow(file.wstring()));
+			else
+				log::info(log::Topic::Hook, "{} does not exist, so every setting keeps its default",
+				          platform::narrow(file.wstring()));
+			for (const std::string& problem : problems)
+				log::warning(log::Topic::Hook, "{}", problem);
 
-			net::LocalServices* const services = startServices(relay::parseServerAddress(OPENFESLHOOK_SERVER_URL));
-			platform::installHostRedirect(hosts, [services](const std::string_view host, const net::Service& service)
+			net::LocalServices* const services = startServices(settings.server);
+			platform::installHostRedirect(settings.hosts, settings.blockUnknownHosts,
+			                              [services](const std::string_view host, const net::Service& service)
 			{
 				(void)services->ensure(service, host);
 			});
+			for (const auto& [host, protocol] : settings.hosts.entries())
+				log::debug(log::Topic::Hook, "[Hosts] {}={}", host, net::protocolName(protocol));
 			log::info(log::Topic::Dns,
-			          "Look-ups of {} host name(s) and domain(s) lead to this PC, and those of other hosts fail",
-			          hosts.entries().size());
+			          "Look-ups of {} host name(s) and domain(s) lead to this PC, and those of other hosts {}",
+			          settings.hosts.entries().size(),
+			          settings.blockUnknownHosts ? "fail" : "go to the system's resolver");
 		}
 		catch (const std::exception& problem)
 		{
 			log::error(log::Topic::Hook, "The hook could not start: {}", problem.what());
 			// The log has no output, but a debugger sees this.
 			OutputDebugStringA(std::format("OpenFESLHook could not start: {}\n", problem.what()).c_str());
+			failure = problem.what();
 		}
+
+		// This thread has nothing left to do, so the dialog holds up neither the hook nor the game.
+		if (failure)
+		{
+			problems.insert(problems.begin(), *failure);
+			showProblems(library, IDS_START_FAILED, problems);
+		}
+		else if (!problems.empty())
+			showProblems(library, IDS_START_PROBLEMS, problems);
 	}
 }

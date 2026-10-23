@@ -38,7 +38,7 @@
   </ImportGroup>
   <PropertyGroup>
     <TargetName>dinput8</TargetName>
-    <!-- The relay server the hook uses; a build may pass its own. -->
+    <!-- The relay server the hook uses unless OpenFESLHook.ini names another; a build may pass its own. -->
     <OpenFESLHookServerUrl Condition="'$(OpenFESLHookServerUrl)' == ''">wss://fesl.grzyb.app</OpenFESLHookServerUrl>
   </PropertyGroup>
   <ItemDefinitionGroup>
@@ -56,15 +56,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\app\open_fesl_hook.hpp" />
+    <ClInclude Include="src\app\settings.hpp" />
     <ClInclude Include="src\platform\host_redirect.hpp" />
     <ClInclude Include="src\platform\text.hpp" />
     <ClInclude Include="src\platform\winhttp.hpp" />
     <ClInclude Include="src\platform\winhttp_forwarder.hpp" />
     <ClInclude Include="src\platform\winhttp_link.hpp" />
+    <ClInclude Include="src\resource.h" />
     <ClInclude Include="src\version.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\app\open_fesl_hook.cpp" />
+    <ClCompile Include="src\app\settings.cpp" />
     <ClCompile Include="src\direct_input.cpp" />
     <ClCompile Include="src\dllmain.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -79,6 +82,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="src\exports.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="src\OpenFESLHook.rc" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="OpenFESLHook.Core.vcxproj">

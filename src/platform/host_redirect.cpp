@@ -24,6 +24,7 @@ namespace openfeslhook::platform
 		struct Redirect
 		{
 			config::HostMap<net::Protocol> hosts;
+			bool blockUnknownHosts = true;
 			Connecting connecting;
 			GetHostByName originalGetHostByName = nullptr;
 			Connect originalConnect = nullptr;
@@ -93,10 +94,15 @@ namespace openfeslhook::platform
 					return answer(name, address);
 				}
 
+				if (gRedirect->blockUnknownHosts)
+				{
+					log::write(levelOfLookUp(name), log::Topic::Dns,
+					           "The look-up of {} was refused, since [Hosts] does not name it", name);
+					WSASetLastError(WSAHOST_NOT_FOUND);
+					return nullptr;
+				}
 				log::write(levelOfLookUp(name), log::Topic::Dns,
-				           "The look-up of {} was refused, since it is not a redirected host", name);
-				WSASetLastError(WSAHOST_NOT_FOUND);
-				return nullptr;
+				           "The look-up of {} goes to the system resolver, since [Hosts] does not name it", name);
 			}
 			catch (const std::exception& problem)
 			{
@@ -104,6 +110,7 @@ namespace openfeslhook::platform
 				WSASetLastError(WSANO_RECOVERY);
 				return nullptr;
 			}
+			return gRedirect->originalGetHostByName(name);
 		}
 
 		int WSAAPI connectTo(const SOCKET socket, const sockaddr* name, const int length) noexcept
@@ -146,10 +153,11 @@ namespace openfeslhook::platform
 		}
 	}
 
-	void installHostRedirect(config::HostMap<net::Protocol> hosts, Connecting connecting)
+	void installHostRedirect(config::HostMap<net::Protocol> hosts, const bool blockUnknownHosts, Connecting connecting)
 	{
 		// Kept for as long as the detours, which is as long as the process.
-		gRedirect = new Redirect{.hosts = std::move(hosts), .connecting = std::move(connecting)};
+		gRedirect = new Redirect{
+			.hosts = std::move(hosts), .blockUnknownHosts = blockUnknownHosts, .connecting = std::move(connecting)};
 
 		if (const MH_STATUS status = MH_Initialize(); status != MH_ERROR_ALREADY_INITIALIZED)
 			check(status, "start");

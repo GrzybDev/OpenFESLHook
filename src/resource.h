@@ -1,0 +1,5 @@
+#pragma once
+
+#define IDS_DIALOG_CAPTION 101
+#define IDS_START_PROBLEMS 102
+#define IDS_START_FAILED 103

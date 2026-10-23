@@ -43,6 +43,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\config\settings.hpp" />
     <ClInclude Include="src\config\values.hpp" />
     <ClInclude Include="src\fesl\packet.hpp" />
     <ClInclude Include="src\http\forwarder.hpp" />
@@ -65,6 +66,8 @@
     <ClInclude Include="src\util\text.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\config\settings.cpp" />
+    <ClCompile Include="src\config\values.cpp" />
     <ClCompile Include="src\fesl\packet.cpp" />
     <ClCompile Include="src\http\masking.cpp" />
     <ClCompile Include="src\logging\log.cpp" />

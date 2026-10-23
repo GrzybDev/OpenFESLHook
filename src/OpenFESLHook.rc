@@ -1,0 +1,8 @@
+#include "resource.h"
+
+STRINGTABLE
+BEGIN
+	IDS_DIALOG_CAPTION "OpenFESLHook"
+	IDS_START_PROBLEMS "OpenFESLHook found problems while starting and runs on as each line describes:"
+	IDS_START_FAILED "OpenFESLHook could not start, so the game runs without it:"
+END

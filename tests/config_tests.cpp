@@ -1,9 +1,102 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
+#include "config/settings.hpp"
 #include "config/values.hpp"
 
 namespace openfeslhook::test
 {
+	namespace
+	{
+		config::Settings parse(const std::string_view text)
+		{
+			return config::parseSettings(text, relay::parseServerAddress("wss://relay.example.test"));
+		}
+
+		bool mentions(const std::vector<std::string>& problems, const std::string_view text)
+		{
+			return std::ranges::any_of(problems, [text](const std::string& problem)
+			{
+				return problem.find(text) != std::string::npos;
+			});
+		}
+	}
+
+	TEST(Settings, ReadsTheFirstSectionOfAFileSavedWithAByteOrderMark)
+	{
+		const config::Settings settings = parse("\xEF\xBB\xBF[Server]\r\nUrl=ws://127.0.0.1:8000\r\n");
+
+		EXPECT_EQ(settings.server, relay::parseServerAddress("ws://127.0.0.1:8000"));
+		EXPECT_TRUE(settings.problems.empty());
+	}
+
+	TEST(Settings, ReportsEachLineItLeavesOutAndKeepsTheRest)
+	{
+		const config::Settings settings = parse(R"(; A comment
+Log.Console=1
+[Server]
+Url = "ws://relay.example.test:8000/ws"
+[Redirect]
+BlockUnknownHosts=maybe
+[Hosts]
+*.fesl.example.test=fesl
+# *.theater.example.test=theater
+*.theater.example.test:18395=theater
+easo.example.test=ssl
+[Logs]
+Console=1
+)");
+
+		EXPECT_EQ(settings.server, relay::parseServerAddress("ws://relay.example.test:8000/ws"));
+		EXPECT_TRUE(settings.blockUnknownHosts);
+		EXPECT_EQ(settings.hosts.entries().size(), 1u);
+		EXPECT_EQ(settings.hosts.find("pc.fesl.example.test"), net::Protocol::Fesl);
+
+		EXPECT_EQ(settings.problems.size(), 5u);
+		for (const std::string_view line : {"Log.Console", "BlockUnknownHosts", "*.theater.example.test:18395",
+		                                    "easo.example.test", "[Logs]"})
+			EXPECT_TRUE(mentions(settings.problems, line)) << line;
+	}
+
+	TEST(Settings, KeepsTheDefaultsWhenTheFileOrItsHostsCannotBeUsed)
+	{
+		const config::Settings missing = parse("");
+		EXPECT_EQ(missing.server, relay::parseServerAddress("wss://relay.example.test"));
+		EXPECT_EQ(missing.hosts.find("bfbc2-pc.fesl.ea.com"), net::Protocol::Fesl);
+		EXPECT_TRUE(missing.problems.empty());
+
+		const config::Settings repeated = parse("[Redirect]\nBlockUnknownHosts=0\nblockunknownhosts=0\n");
+		EXPECT_TRUE(repeated.blockUnknownHosts);
+		EXPECT_EQ(repeated.hosts.find("bfbc2-pc.theater.ea.com"), net::Protocol::Theater);
+		ASSERT_EQ(repeated.problems.size(), 1u);
+		EXPECT_TRUE(repeated.problems.front().starts_with("line 3:")) << repeated.problems.front();
+
+		const config::Settings unusable = parse("[Hosts]\n*.fesl.example.test=ssl\n");
+		EXPECT_EQ(unusable.hosts.find("bfbc2-pc-server.fesl.ea.com"), net::Protocol::Fesl);
+		EXPECT_FALSE(unusable.hosts.find("pc.fesl.example.test"));
+		EXPECT_EQ(unusable.problems.size(), 2u);
+	}
+
+	TEST(ConfigValues, ReadsSwitches)
+	{
+		for (const std::string_view on : {"1", "true", "Yes", "ON"})
+			EXPECT_TRUE(config::parseFlag(on)) << on;
+		for (const std::string_view off : {"0", "False", "no", "off"})
+			EXPECT_FALSE(config::parseFlag(off)) << off;
+
+		EXPECT_THROW((void)config::parseFlag("enabled"), std::invalid_argument);
+	}
+
+	TEST(ConfigValues, ReadsProtocols)
+	{
+		EXPECT_EQ(config::parseProtocol("FESL"), net::Protocol::Fesl);
+		EXPECT_THROW((void)config::parseProtocol("ssl"), std::invalid_argument);
+	}
+
 	TEST(HostMap, PicksTheMostSpecificKeyAsDnsComparesNames)
 	{
 		config::HostMap<int> hosts;

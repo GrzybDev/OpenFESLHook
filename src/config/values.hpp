@@ -8,8 +8,25 @@
 
 #include <boost/algorithm/string/case_conv.hpp>
 
+#include "net/service.hpp"
+
 namespace openfeslhook::config
 {
+	/// Reads a protocol by its name: fesl, theater or http.
+	/// @param text The value.
+	/// @throws std::invalid_argument When the value names no protocol the hook serves.
+	[[nodiscard]] net::Protocol parseProtocol(std::string_view text);
+
+	/// Reads a key of [Hosts]: a host name, or "*." and a domain, which stands for every host below it.
+	/// @param text The key.
+	/// @throws std::invalid_argument When the key is neither.
+	[[nodiscard]] std::string parseHostPattern(std::string_view text);
+
+	/// Reads a switch: 1, true, yes or on, or 0, false, no or off.
+	/// @param text The value.
+	/// @throws std::invalid_argument When the value is none of them.
+	[[nodiscard]] bool parseFlag(std::string_view text);
+
 	/// Values by host name, where a key is a host name or "*." and a domain, which stands for every host below the
 	/// domain; names compare as DNS compares them, ignoring case and a final dot, and the most specific key wins.
 	template <typename Value>
