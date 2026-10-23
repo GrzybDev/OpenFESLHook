@@ -31,6 +31,12 @@ namespace openfeslhook::net
 		return description_;
 	}
 
+	void Listener::stop()
+	{
+		boost::system::error_code ignored;
+		acceptor_.close(ignored);
+	}
+
 	Listener::Listener(boost::asio::io_context& io, Accepted accepted) : acceptor_(io), accepted_(std::move(accepted))
 	{
 	}

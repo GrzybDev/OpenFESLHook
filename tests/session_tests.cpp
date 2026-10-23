@@ -63,6 +63,27 @@ namespace openfeslhook::test
 		EXPECT_TRUE(fixture.server.closed(0));
 	}
 
+	TEST(RelaySession, OpensDatagramPeersOnlyAlongATcpConnection)
+	{
+		Fixture fixture;
+		const auto theater = std::make_shared<RecordingEndpoint>();
+		const auto peer = std::make_shared<RecordingEndpoint>();
+
+		const relay::OpenBody datagramPorts{.listenPort = 18395, .gamePort = 50002};
+		EXPECT_FALSE(fixture.session->attach(relay::Channel::TheaterDatagram, datagramPorts, peer));
+		EXPECT_EQ(fixture.server.connections(), 0u);
+
+		const std::optional<std::uint16_t> connection =
+			fixture.session->attach(relay::Channel::Theater, {.listenPort = 18395, .gamePort = 50003}, theater);
+		ASSERT_TRUE(connection);
+		EXPECT_TRUE(fixture.session->attach(relay::Channel::TheaterDatagram, datagramPorts, peer));
+		fixture.session->detach(relay::Channel::Theater, *connection);
+
+		EXPECT_TRUE(fixture.server.closed(0));
+		EXPECT_TRUE(peer->closed);
+		EXPECT_EQ(fixture.server.frames(0).size(), 2u);
+	}
+
 	TEST(RelaySession, ClosesTheGameConnectionsWhenTheRelayServerGoesAway)
 	{
 		Fixture fixture;

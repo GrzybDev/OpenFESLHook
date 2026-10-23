@@ -55,36 +55,53 @@ namespace openfeslhook::test
 		EXPECT_TRUE(server.waitUntil([&] { return server.closed(0); }));
 	}
 
-	TEST(LocalServices, RelaysATheaterConnectionOverTcp)
+	TEST(LocalServices, RelaysTheaterDatagramsAlongsideTheTheaterConnection)
 	{
 		FakeRelayServer server;
 		net::LocalServices services(server.factory());
 		const std::optional<std::uint16_t> port =
 			services.ensure({.protocol = net::Protocol::Theater, .port = 0}, "game-pc.theater.example.test");
 		ASSERT_TRUE(port);
+		const boost::asio::ip::udp::endpoint theaterDatagrams(boost::asio::ip::address_v4::loopback(), *port);
 
 		boost::asio::io_context io;
+		boost::asio::ip::udp::socket datagrams(io, {boost::asio::ip::address_v4::loopback(), 0});
+		const fesl::Packet echo = makePacket("ECHO", 0x40000000, "TID=0\nTYPE=1\nUID=1\n\0"sv);
+		// Sent before any Theater connection, so there is no session for it to ride along.
+		datagrams.send_to(boost::asio::buffer(echo), theaterDatagrams);
+
 		boost::asio::ip::tcp::socket theater(io);
 		theater.connect({boost::asio::ip::address_v4::loopback(), *port});
 		const fesl::Packet conn = makePacket("CONN", 0x40000000, "TID=1\nPROT=2\n\0"sv);
 		boost::asio::write(theater, boost::asio::buffer(conn));
 		ASSERT_TRUE(server.waitUntil([&] { return server.connections() == 1 && server.frames(0).size() == 2; }));
+		datagrams.send_to(boost::asio::buffer(echo), theaterDatagrams);
+		ASSERT_TRUE(server.waitUntil([&] { return server.frames(0).size() == 4; }));
 
 		const std::vector<relay::Frame> frames = server.frames(0);
 		const std::uint16_t connection = frames[0].connection;
+		const std::uint16_t peer = frames[2].connection;
 		EXPECT_EQ(frames[0], relay::openFrame(relay::Channel::Theater, connection,
 		                                      {.listenPort = *port,
 		                                       .gamePort = theater.local_endpoint().port(),
 		                                       .host = "game-pc.theater.example.test"}));
 		EXPECT_EQ(frames[1], relay::dataFrame(relay::Channel::Theater, connection, conn));
+		EXPECT_EQ(frames[2], relay::openFrame(relay::Channel::TheaterDatagram, peer,
+		                                      {.listenPort = *port,
+		                                       .gamePort = datagrams.local_endpoint().port(),
+		                                       .host = "game-pc.theater.example.test"}));
+		EXPECT_EQ(frames[3], relay::dataFrame(relay::Channel::TheaterDatagram, peer, echo));
 
 		const fesl::Packet answer = makePacket("CONN", 0x00000000, "TID=1\nactivityTimeoutSecs=0\n\0"sv);
+		const fesl::Packet echoed = makePacket("ECHO", 0x00000000, "TID=0\nTXN=ECHO\nIP=192.0.2.1\n\0"sv);
 		server.accept(0);
 		server.send(0, relay::dataFrame(relay::Channel::Theater, connection, answer));
+		server.send(0, relay::dataFrame(relay::Channel::TheaterDatagram, peer, echoed));
 
 		fesl::Packet received(answer.size());
 		EXPECT_FALSE(readWithin(theater, boost::asio::buffer(received)));
 		EXPECT_EQ(received, answer);
+		EXPECT_EQ(receiveWithin(datagrams), echoed);
 
 		theater.close();
 		EXPECT_TRUE(server.waitUntil([&] { return server.closed(0); }));

@@ -5,12 +5,14 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include <boost/asio/cancel_after.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/udp.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/asio/ssl/context.hpp>
 
@@ -46,6 +48,11 @@ namespace openfeslhook::test
 		io.run();
 		return result == boost::asio::error::operation_aborted ? boost::asio::error::timed_out : result;
 	}
+
+	/// Receives a datagram, giving up after a few seconds.
+	/// @param socket A socket whose executor belongs to an io_context nobody else runs, with no other work pending.
+	/// @return The datagram, or nothing when none came.
+	std::optional<std::vector<std::uint8_t>> receiveWithin(boost::asio::ip::udp::socket& socket);
 
 	struct FakeRelayState;
 

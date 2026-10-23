@@ -2,6 +2,7 @@
 #include "local_services.hpp"
 
 #include "logging/log.hpp"
+#include "net/datagram_relay.hpp"
 #include "net/stream_connection.hpp"
 #include "tls/game_tls.hpp"
 
@@ -74,11 +75,37 @@ namespace openfeslhook::net
 
 	std::shared_ptr<Listener> LocalServices::listenForTheater(const Service& service, const std::string_view host)
 	{
-		return Listener::start(io_, service, host,
-		                       [host = std::string(host), session = session_](boost::asio::ip::tcp::socket socket)
+		// The game sends its Theater datagrams to the port of its Theater connection, so both need the same port.
+		// Windows hands out free ports in order and reserves blocks of them for TCP and UDP apart, so the next free TCP
+		// ports may all be reserved for UDP; when any port will do, ports of the dynamic range are tried at random.
+		const auto accepted = [host = std::string(host), session = session_](boost::asio::ip::tcp::socket socket)
 		{
 			std::make_shared<TcpConnection>(std::move(socket), relay::Channel::Theater, host, session)->start();
-		});
+		};
+		std::minstd_rand random(std::random_device{}());
+		std::uniform_int_distribution<int> dynamicPorts(49152, 65535);
+		const int attempts = service.port == 0 ? 64 : 1;
+		for (int attempt = 1;; ++attempt)
+		{
+			const std::uint16_t port =
+				service.port != 0 ? service.port : static_cast<std::uint16_t>(dynamicPorts(random));
+			std::shared_ptr<Listener> listener;
+			try
+			{
+				listener = Listener::start(io_, {service.protocol, service.address, port}, host, accepted);
+				(void)DatagramRelay::start(io_, service.address, port, std::string(host), session_);
+				return listener;
+			}
+			catch (const boost::system::system_error& problem)
+			{
+				if (listener)
+					listener->stop();
+				if (attempt == attempts)
+					throw;
+				log::debug(log::Topic::Theater, "Theater cannot listen on port {} for {}, so another port is tried: {}",
+				           port, host, problem.what());
+			}
+		}
 	}
 
 	void LocalServices::run()

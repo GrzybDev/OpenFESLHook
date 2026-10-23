@@ -14,7 +14,7 @@ namespace openfeslhook::net
 	{
 		/// FESL over SSLv3.
 		Fesl,
-		/// Theater over TCP.
+		/// Theater over TCP, and its datagrams over UDP on the same port.
 		Theater,
 	};
 

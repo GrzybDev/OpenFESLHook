@@ -19,6 +19,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <ranges>
 #include <span>
 #include <stdexcept>

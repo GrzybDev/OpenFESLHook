@@ -18,12 +18,13 @@
 
 namespace openfeslhook::relay
 {
-	/// Carries the game's connections over one connection to the relay server, which is open while any of them is.
+	/// Carries the game's connections over one connection to the relay server, which is open while any game connection
+	/// over TCP is.
 	class Session final : public Route, public std::enable_shared_from_this<Session>
 	{
 	public:
-		/// Makes a session that connects to the relay server with the game's first connection and disconnects after its
-		/// last one.
+		/// Makes a session that connects to the relay server once the game opens a TCP connection; a datagram peer is
+		/// refused while none is open, and the connection to the relay server closes with the last one.
 		/// @param executor Where the relay server's events are handled.
 		/// @param connect Makes a new connection to the relay server whenever the session needs one.
 		Session(boost::asio::any_io_executor executor, UpstreamFactory connect);
@@ -51,11 +52,13 @@ namespace openfeslhook::relay
 		std::uint64_t generation_ = 0;
 		bool upstreamOpened_ = false;
 		std::map<Key, std::weak_ptr<Endpoint>> endpoints_;
+		std::size_t streams_ = 0;
 		std::array<std::uint16_t, 3> lastNumbers_{};
 
 		std::optional<std::uint16_t> allocate(Channel channel);
 		void open();
 		void send(const Frame& frame);
+		void forget(Key key);
 		void received(std::vector<std::uint8_t> message);
 		void end(std::string_view reason);
 	};

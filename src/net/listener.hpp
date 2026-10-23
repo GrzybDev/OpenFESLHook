@@ -68,6 +68,9 @@ namespace openfeslhook::net
 		/// Names the protocol, the address and port and the host the listener serves, for the log.
 		[[nodiscard]] const std::string& description() const;
 
+		/// Stops accepting and frees the port.
+		void stop();
+
 	private:
 		boost::asio::ip::tcp::acceptor acceptor_;
 		Accepted accepted_;

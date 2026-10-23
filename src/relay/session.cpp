@@ -5,6 +5,14 @@
 
 namespace openfeslhook::relay
 {
+	namespace
+	{
+		bool isStream(const Channel channel)
+		{
+			return channel != Channel::TheaterDatagram;
+		}
+	}
+
 	Session::Session(boost::asio::any_io_executor executor, UpstreamFactory connect)
 		: executor_(std::move(executor)), connect_(std::move(connect))
 	{
@@ -13,6 +21,10 @@ namespace openfeslhook::relay
 	std::optional<std::uint16_t> Session::attach(const Channel channel, const OpenBody& ports,
 	                                             std::weak_ptr<Endpoint> endpoint)
 	{
+		const bool stream = isStream(channel);
+		if (!stream && !upstream_)
+			return std::nullopt;
+
 		const std::optional<std::uint16_t> connection = allocate(channel);
 		if (!connection)
 		{
@@ -24,6 +36,8 @@ namespace openfeslhook::relay
 		if (!upstream_)
 			open();
 		endpoints_.emplace(Key{channel, *connection}, std::move(endpoint));
+		if (stream)
+			++streams_;
 
 		log::info(channelTopic(channel), "{} #{} for {} opened from port {} to port {}", channelName(channel),
 		          *connection, ports.host, ports.gamePort, ports.listenPort);
@@ -46,8 +60,8 @@ namespace openfeslhook::relay
 		if (!endpoints_.contains(key))
 			return;
 
-		endpoints_.erase(key);
-		if (endpoints_.empty())
+		forget(key);
+		if (streams_ == 0)
 			end("the game closed its last connection");
 		else
 			send(closeFrame(channel, connection));
@@ -119,6 +133,12 @@ namespace openfeslhook::relay
 		upstream_->send(encode(frame));
 	}
 
+	void Session::forget(const Key key)
+	{
+		if (endpoints_.erase(key) != 0 && isStream(key.channel))
+			--streams_;
+	}
+
 	void Session::received(std::vector<std::uint8_t> message)
 	{
 		Frame frame;
@@ -152,12 +172,12 @@ namespace openfeslhook::relay
 				endpoint->deliver(std::move(frame.body));
 			break;
 		case FrameType::Close:
-			endpoints_.erase(key);
+			forget(key);
 			log::info(channelTopic(frame.channel), "{} #{} closed by the relay server", channelName(frame.channel),
 			          frame.connection);
 			if (endpoint)
 				endpoint->close();
-			if (endpoints_.empty())
+			if (streams_ == 0)
 				end("the relay server closed the last game connection");
 			break;
 		case FrameType::Open:
@@ -176,6 +196,7 @@ namespace openfeslhook::relay
 			upstream_.reset();
 		}
 
+		streams_ = 0;
 		for (const auto& [key, endpoint] : std::exchange(endpoints_, {}))
 		{
 			if (const std::shared_ptr<Endpoint> alive = endpoint.lock())
