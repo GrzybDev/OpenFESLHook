@@ -51,8 +51,10 @@ namespace openfeslhook::test
 
 	/// Receives a datagram, giving up after a few seconds.
 	/// @param socket A socket whose executor belongs to an io_context nobody else runs, with no other work pending.
+	/// @param sender Where to store who sent the datagram, if anywhere.
 	/// @return The datagram, or nothing when none came.
-	std::optional<std::vector<std::uint8_t>> receiveWithin(boost::asio::ip::udp::socket& socket);
+	std::optional<std::vector<std::uint8_t>> receiveWithin(boost::asio::ip::udp::socket& socket,
+	                                                       boost::asio::ip::udp::endpoint* sender = nullptr);
 
 	struct FakeRelayState;
 

@@ -39,8 +39,8 @@ namespace openfeslhook::relay
 		if (stream)
 			++streams_;
 
-		log::info(channelTopic(channel), "{} #{} for {} opened from port {} to port {}", channelName(channel),
-		          *connection, ports.host, ports.gamePort, ports.listenPort);
+		log::write(openingLevel(channel), channelTopic(channel), "{} #{} for {} opened from port {} to port {}",
+		           channelName(channel), *connection, ports.host, ports.gamePort, ports.listenPort);
 		send(openFrame(channel, *connection, ports));
 		return connection;
 	}

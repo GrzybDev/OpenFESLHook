@@ -82,7 +82,13 @@ namespace openfeslhook::test
 	{
 		FakeRelayServer server;
 		const auto forwarder = std::make_shared<RecordingForwarder>();
-		net::LocalServices services(server.factory(), [forwarder] { return forwarder; });
+		std::vector<std::optional<net::Target>> asked;
+		const net::HttpForwarders forwarders = [&](const std::optional<net::Target>& forward)
+		{
+			asked.push_back(forward);
+			return forwarder;
+		};
+		net::LocalServices services(server.factory(), forwarders);
 		const std::optional<std::uint16_t> port =
 			services.ensure({.protocol = net::Protocol::Http, .port = 0}, "easo.example.test");
 		ASSERT_TRUE(port);
@@ -104,13 +110,32 @@ namespace openfeslhook::test
 		EXPECT_EQ(requests[0].target(), "/easo/editorial/BF/2010/BFBC2/config/PC/version");
 		EXPECT_EQ(requests[1].target(), "/fileupload/locker2.jsp?cmd=dir");
 		EXPECT_EQ(requests[0][beast::http::field::host], "easo.example.test");
+		EXPECT_EQ(asked, (std::vector<std::optional<net::Target>>{std::nullopt}));
 		EXPECT_EQ(server.connections(), 0u);
+	}
+
+	TEST(LocalServices, AsksForAForwarderToTheServerAnHttpPortGoesTo)
+	{
+		FakeRelayServer server;
+		const net::Target emulator{.host = "192.0.2.10", .port = 8080};
+		std::vector<std::optional<net::Target>> asked;
+		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>& forward)
+		{
+			asked.push_back(forward);
+			return std::make_shared<RecordingForwarder>();
+		});
+
+		EXPECT_TRUE(services.ensure({.protocol = net::Protocol::Http, .port = 0}, "easo.example.test", emulator));
+		EXPECT_EQ(asked, (std::vector<std::optional<net::Target>>{emulator}));
 	}
 
 	TEST(LocalServices, AnswersWithBadGatewayWhenTheServerSendsNoResponse)
 	{
 		FakeRelayServer server;
-		net::LocalServices services(server.factory(), [] { return std::make_shared<RecordingForwarder>(false); });
+		net::LocalServices services(server.factory(), [](const std::optional<net::Target>&)
+		{
+			return std::make_shared<RecordingForwarder>(false);
+		});
 		const std::optional<std::uint16_t> port =
 			services.ensure({.protocol = net::Protocol::Http, .port = 0}, "easo.example.test");
 		ASSERT_TRUE(port);

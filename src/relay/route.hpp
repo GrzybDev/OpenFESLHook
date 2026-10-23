@@ -59,6 +59,14 @@ namespace openfeslhook::relay
 		return channel == Channel::Fesl ? log::Topic::Fesl : log::Topic::Theater;
 	}
 
+	/// Picks the log level of a connection's opening: info for the game's connections, debug for its datagram
+	/// sockets, which open again with each datagram while a server they go to cannot be reached.
+	/// @param channel The channel.
+	[[nodiscard]] constexpr log::Level openingLevel(const Channel channel)
+	{
+		return channel == Channel::TheaterDatagram ? log::Level::Debug : log::Level::Info;
+	}
+
 	/// Logs a packet that a route carries, with its fields, at debug level.
 	/// @param channel The connection's service.
 	/// @param connection The connection's number.

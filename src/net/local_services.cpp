@@ -9,6 +9,16 @@
 
 namespace openfeslhook::net
 {
+	namespace
+	{
+		std::optional<Target> withPort(std::optional<Target> forward, const std::uint16_t port)
+		{
+			if (forward && forward->port == 0)
+				forward->port = port;
+			return forward;
+		}
+	}
+
 	LocalServices::LocalServices(relay::UpstreamFactory upstream, HttpForwarders http)
 		: work_(io_.get_executor()),
 		  session_(std::make_shared<relay::Session>(io_.get_executor(), std::move(upstream))), http_(std::move(http)),
@@ -23,15 +33,17 @@ namespace openfeslhook::net
 		thread_.join();
 	}
 
-	std::optional<std::uint16_t> LocalServices::ensure(const Service& service, const std::string_view host)
+	std::optional<std::uint16_t> LocalServices::ensure(const Service& service, const std::string_view host,
+	                                                   const std::optional<Target>& forward)
 	{
 		if (io_.get_executor().running_in_this_thread())
-			return listen(service, host);
+			return listen(service, host, forward);
 
-		return boost::asio::post(io_, boost::asio::use_future([&] { return listen(service, host); })).get();
+		return boost::asio::post(io_, boost::asio::use_future([&] { return listen(service, host, forward); })).get();
 	}
 
-	std::optional<std::uint16_t> LocalServices::listen(const Service& service, const std::string_view host)
+	std::optional<std::uint16_t> LocalServices::listen(const Service& service, const std::string_view host,
+	                                                   const std::optional<Target>& forward)
 	{
 		if (const auto found = ports_.find(service); found != ports_.end())
 			return found->second;
@@ -42,13 +54,13 @@ namespace openfeslhook::net
 			switch (service.protocol)
 			{
 			case Protocol::Fesl:
-				listener = listenForFesl(service, host);
+				listener = listenForFesl(service, host, routeFor(service, forward));
 				break;
 			case Protocol::Theater:
-				listener = listenForTheater(service, host);
+				listener = listenForTheater(service, host, routeFor(service, forward));
 				break;
 			case Protocol::Http:
-				listener = listenForHttp(service, host);
+				listener = listenForHttp(service, host, withPort(forward, service.port));
 				break;
 			}
 
@@ -65,26 +77,40 @@ namespace openfeslhook::net
 		}
 	}
 
-	std::shared_ptr<Listener> LocalServices::listenForFesl(const Service& service, const std::string_view host)
+	std::shared_ptr<relay::Route> LocalServices::routeFor(const Service& service, const std::optional<Target>& forward)
+	{
+		if (!forward)
+			return session_;
+
+		const Target target = *withPort(forward, service.port);
+		log::info(protocolTopic(service.protocol), "The {} service of port {} goes straight to {}:{}",
+		          protocolName(service.protocol), service.port, target.host, target.port);
+		return std::make_shared<DirectRoute>(io_, target);
+	}
+
+	std::shared_ptr<Listener> LocalServices::listenForFesl(const Service& service, const std::string_view host,
+	                                                       std::shared_ptr<relay::Route> route)
 	{
 		const auto tls = std::make_shared<tls::GameTls>(host);
 		return Listener::start(io_, service, host,
-		                       [tls, host = std::string(host), session = session_](boost::asio::ip::tcp::socket socket)
+		                       [tls, host = std::string(host), route = std::move(route)](
+			                       boost::asio::ip::tcp::socket socket)
 		{
 			using Stream = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
 			Stream stream(std::move(socket), tls->context());
-			std::make_shared<TlsConnection>(std::move(stream), relay::Channel::Fesl, host, session)->start();
+			std::make_shared<TlsConnection>(std::move(stream), relay::Channel::Fesl, host, route)->start();
 		});
 	}
 
-	std::shared_ptr<Listener> LocalServices::listenForTheater(const Service& service, const std::string_view host)
+	std::shared_ptr<Listener> LocalServices::listenForTheater(const Service& service, const std::string_view host,
+	                                                          const std::shared_ptr<relay::Route>& route)
 	{
 		// The game sends its Theater datagrams to the port of its Theater connection, so both need the same port.
 		// Windows hands out free ports in order and reserves blocks of them for TCP and UDP apart, so the next free TCP
 		// ports may all be reserved for UDP; when any port will do, ports of the dynamic range are tried at random.
-		const auto accepted = [host = std::string(host), session = session_](boost::asio::ip::tcp::socket socket)
+		const auto accepted = [host = std::string(host), route](boost::asio::ip::tcp::socket socket)
 		{
-			std::make_shared<TcpConnection>(std::move(socket), relay::Channel::Theater, host, session)->start();
+			std::make_shared<TcpConnection>(std::move(socket), relay::Channel::Theater, host, route)->start();
 		};
 		std::minstd_rand random(std::random_device{}());
 		std::uniform_int_distribution<int> dynamicPorts(49152, 65535);
@@ -97,7 +123,7 @@ namespace openfeslhook::net
 			try
 			{
 				listener = Listener::start(io_, {service.protocol, service.address, port}, host, accepted);
-				(void)DatagramRelay::start(io_, service.address, port, std::string(host), session_);
+				(void)DatagramRelay::start(io_, service.address, port, std::string(host), route);
 				return listener;
 			}
 			catch (const boost::system::system_error& problem)
@@ -112,9 +138,14 @@ namespace openfeslhook::net
 		}
 	}
 
-	std::shared_ptr<Listener> LocalServices::listenForHttp(const Service& service, const std::string_view host)
+	std::shared_ptr<Listener> LocalServices::listenForHttp(const Service& service, const std::string_view host,
+	                                                       std::optional<Target> forward)
 	{
-		std::shared_ptr<http::Forwarder> forwarder = http_ ? http_() : nullptr;
+		if (forward)
+			log::info(log::Topic::Http, "The http service of port {} goes straight to {}:{}", service.port,
+			          forward->host, forward->port);
+
+		std::shared_ptr<http::Forwarder> forwarder = http_ ? http_(forward) : nullptr;
 		if (!forwarder)
 			throw std::runtime_error("nothing can forward HTTP requests");
 

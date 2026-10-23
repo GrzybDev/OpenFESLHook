@@ -9,6 +9,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include "logging/log.hpp"
+#include "net/direct_route.hpp"
 #include "net/service.hpp"
 
 namespace openfeslhook::config
@@ -18,10 +19,16 @@ namespace openfeslhook::config
 	/// @throws std::invalid_argument When the value names no protocol the hook serves.
 	[[nodiscard]] net::Protocol parseProtocol(std::string_view text);
 
-	/// Reads a key of [Hosts]: a host name, or "*." and a domain, which stands for every host below it.
+	/// Reads a key of [Hosts] or [Forward]: a host name, or "*." and a domain, which stands for every host below it.
 	/// @param text The key.
 	/// @throws std::invalid_argument When the key is neither.
 	[[nodiscard]] std::string parseHostPattern(std::string_view text);
+
+	/// Reads a server to forward to, as "tcp://host[:port]" or "host[:port]"; a server without a port gets port 0,
+	/// which stands for the port the game connected to.
+	/// @param text The value.
+	/// @throws std::invalid_argument When the value is not a server.
+	[[nodiscard]] net::Target parseTarget(std::string_view text);
 
 	/// Reads a log level by its name: trace, debug, info, warning or error.
 	/// @param text The value.

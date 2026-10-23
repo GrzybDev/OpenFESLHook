@@ -29,9 +29,19 @@ namespace openfeslhook::app
 			return path;
 		}
 
-		platform::HttpDestination destination(const relay::ServerAddress& server)
+		std::string describe(const net::Target& target)
 		{
-			return {.secure = server.secure, .host = server.host, .port = server.port};
+			return std::format("tcp://{}{}", platform::urlHost(target.host),
+			                   target.port == 0 ? "" : std::format(":{}", target.port));
+		}
+
+		platform::HttpDestination destination(const relay::ServerAddress& server,
+		                                      const std::optional<net::Target>& forward)
+		{
+			if (!forward)
+				return {.secure = server.secure, .host = server.host, .port = server.port};
+
+			return {.secure = false, .host = forward->host, .port = forward->port};
 		}
 
 		net::LocalServices* startServices(const relay::ServerAddress& server)
@@ -46,9 +56,9 @@ namespace openfeslhook::app
 			// Never destroyed: the process may end while its threads run, when nothing may wait for them.
 			return new net::LocalServices(
 				[webSockets, server] { return std::make_unique<platform::WinHttpLink>(webSockets, server); },
-				[session, server]
+				[session, server](const std::optional<net::Target>& forward)
 				{
-					return std::make_shared<platform::WinHttpForwarder>(session, destination(server));
+					return std::make_shared<platform::WinHttpForwarder>(session, destination(server, forward));
 				});
 		}
 
@@ -105,12 +115,15 @@ namespace openfeslhook::app
 
 			net::LocalServices* const services = startServices(settings.server);
 			platform::installHostRedirect(settings.hosts, settings.blockUnknownHosts,
-			                              [services](const std::string_view host, const net::Service& service)
+			                              [services, forwards = settings.forwards](const std::string_view host,
+			                                                                       const net::Service& service)
 			{
-				(void)services->ensure(service, host);
+				(void)services->ensure(service, host, forwards.find(host));
 			});
 			for (const auto& [host, protocol] : settings.hosts.entries())
 				log::debug(log::Topic::Hook, "[Hosts] {}={}", host, net::protocolName(protocol));
+			for (const auto& [host, target] : settings.forwards.entries())
+				log::debug(log::Topic::Hook, "[Forward] {}={}", host, describe(target));
 			log::info(log::Topic::Dns,
 			          "Look-ups of {} host name(s) and domain(s) lead to this PC, and those of other hosts {}",
 			          settings.hosts.entries().size(),

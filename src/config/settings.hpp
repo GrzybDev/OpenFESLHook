@@ -7,6 +7,7 @@
 
 #include "config/values.hpp"
 #include "logging/log.hpp"
+#include "net/direct_route.hpp"
 #include "net/service.hpp"
 #include "relay/server_address.hpp"
 
@@ -26,8 +27,8 @@ namespace openfeslhook::config
 		log::Level fileLevel = log::Level::Debug;
 	};
 
-	/// The settings of OpenFESLHook.ini; a value the file leaves out or gets wrong keeps its default, a [Hosts] line it
-	/// gets wrong is left out, and a file that is not INI leaves every default.
+	/// The settings of OpenFESLHook.ini; a value the file leaves out or gets wrong keeps its default, a [Hosts] or
+	/// [Forward] line it gets wrong is left out, and a file that is not INI leaves every default.
 	struct Settings
 	{
 		/// The relay server, from [Server] Url.
@@ -36,6 +37,8 @@ namespace openfeslhook::config
 		bool blockUnknownHosts = true;
 		/// The hosts and domains the hook redirects and the protocol each speaks, from [Hosts].
 		HostMap<net::Protocol> hosts;
+		/// The hosts and domains whose services go straight to a server of their own, from [Forward].
+		HostMap<net::Target> forwards;
 		/// Where the log goes, from [Log].
 		LogOptions log;
 		/// What was wrong in the file, to report once the log is open.

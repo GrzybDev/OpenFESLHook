@@ -4,6 +4,7 @@
 #include <set>
 #include <sstream>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
@@ -26,6 +27,23 @@ namespace openfeslhook::config
 			const bool quoted = text.size() >= 2 && (text.front() == '"' || text.front() == '\'') &&
 			                    text.back() == text.front();
 			return quoted ? text.substr(1, text.size() - 2) : text;
+		}
+
+		// Whether a [Forward] key names a host that [Hosts] redirects, or with "*." a domain that holds one.
+		bool redirectsAny(const HostMap<net::Protocol>& hosts, const std::string_view pattern)
+		{
+			if (hosts.find(pattern))
+				return true;
+			if (!pattern.starts_with("*."))
+				return false;
+
+			std::string_view domain = pattern.substr(1);
+			if (domain.ends_with('.'))
+				domain.remove_suffix(1);
+			return std::ranges::any_of(hosts.entries(), [domain](const auto& entry)
+			{
+				return boost::algorithm::iends_with(entry.first, domain);
+			});
 		}
 
 		std::filesystem::path parsePath(const std::string_view text)
@@ -177,6 +195,22 @@ namespace openfeslhook::config
 				settings.problems.emplace_back("[Hosts] has no line the hook can use; the default hosts stay");
 			for (const auto& [host, protocol] : kGameHosts)
 				settings.hosts.add(host, protocol);
+		}
+
+		for (const auto& [host, value] : reader.remaining("Forward"))
+		{
+			try
+			{
+				settings.forwards.add(parseHostPattern(host), parseTarget(value));
+			}
+			catch (const std::invalid_argument& problem)
+			{
+				reader.report(std::format("[Forward] {}", host), problem, "the line is left out");
+				continue;
+			}
+			if (!redirectsAny(settings.hosts, host))
+				settings.problems.push_back(
+					std::format("[Forward] {}: [Hosts] redirects no host it names, so the line has no effect", host));
 		}
 
 		reader.read("Log", "Console", settings.log.console, parseFlag);

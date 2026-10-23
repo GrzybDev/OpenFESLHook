@@ -90,23 +90,27 @@ namespace openfeslhook::test
 		return wrapped;
 	}
 
-	std::optional<std::vector<std::uint8_t>> receiveWithin(boost::asio::ip::udp::socket& socket)
+	std::optional<std::vector<std::uint8_t>> receiveWithin(boost::asio::ip::udp::socket& socket,
+	                                                       boost::asio::ip::udp::endpoint* sender)
 	{
 		auto& io = static_cast<boost::asio::io_context&>(socket.get_executor().context());
 		std::vector<std::uint8_t> datagram(64 * 1024);
+		boost::asio::ip::udp::endpoint from;
 		std::optional<std::size_t> received;
 		const auto receive = [&received](const boost::system::error_code& error, const std::size_t size)
 		{
 			if (!error)
 				received = size;
 		};
-		socket.async_receive(boost::asio::buffer(datagram),
-		                     boost::asio::cancel_after(std::chrono::seconds(5), receive));
+		socket.async_receive_from(boost::asio::buffer(datagram), from,
+		                          boost::asio::cancel_after(std::chrono::seconds(5), receive));
 		io.restart();
 		io.run();
 		if (!received)
 			return std::nullopt;
 
+		if (sender)
+			*sender = from;
 		datagram.resize(*received);
 		return datagram;
 	}

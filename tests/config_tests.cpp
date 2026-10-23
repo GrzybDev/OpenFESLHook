@@ -49,6 +49,10 @@ BlockUnknownHosts=maybe
 # *.theater.example.test=theater
 *.theater.example.test:18395=theater
 easo.example.test=ssl
+[Forward]
+*.fesl.example.test=emulator.example.test:18390
+other.example.test=emulator.example.test
+*.other.example.test=emulator.example.test
 [log]
 file=yes
 ConsoleColors=off
@@ -62,15 +66,18 @@ Console=1
 		EXPECT_TRUE(settings.blockUnknownHosts);
 		EXPECT_EQ(settings.hosts.entries().size(), 1u);
 		EXPECT_EQ(settings.hosts.find("pc.fesl.example.test"), net::Protocol::Fesl);
+		const net::Target emulator{.host = "emulator.example.test", .port = 18390};
+		EXPECT_EQ(settings.forwards.find("pc.fesl.example.test"), emulator);
 		EXPECT_TRUE(settings.log.file);
 		EXPECT_FALSE(settings.log.console);
 		EXPECT_FALSE(settings.log.consoleColors);
 		EXPECT_EQ(settings.log.fileLevel, log::Level::Debug);
 		EXPECT_EQ(settings.log.path, std::filesystem::path(u8"logi\\zażółć.log"));
 
-		EXPECT_EQ(settings.problems.size(), 6u);
+		EXPECT_EQ(settings.problems.size(), 8u);
 		for (const std::string_view line : {"Log.Console", "BlockUnknownHosts", "*.theater.example.test:18395",
-		                                    "easo.example.test", "FileLevl", "[Logs]"})
+		                                    "easo.example.test", "[Forward] other.example.test",
+		                                    "[Forward] *.other.example.test", "FileLevl", "[Logs]"})
 			EXPECT_TRUE(mentions(settings.problems, line)) << line;
 	}
 
@@ -109,6 +116,20 @@ Console=1
 	{
 		EXPECT_EQ(config::parseProtocol("FESL"), net::Protocol::Fesl);
 		EXPECT_THROW((void)config::parseProtocol("ssl"), std::invalid_argument);
+	}
+
+	TEST(ConfigValues, ReadsServersToForwardTo)
+	{
+		EXPECT_EQ(config::parseTarget("192.0.2.5:18395"), (net::Target{.host = "192.0.2.5", .port = 18395}));
+		EXPECT_EQ(config::parseTarget("emulator.example.test"), (net::Target{.host = "emulator.example.test"}));
+		EXPECT_EQ(config::parseTarget("TCP://[::1]:19021"), (net::Target{.host = "::1", .port = 19021}));
+		EXPECT_EQ(config::parseTarget("[::1]"), (net::Target{.host = "::1", .port = 0}));
+
+		for (const std::string_view target : {"udp://emulator.example.test:1", ":18390", "emulator.example.test:",
+		                                      "emulator.example.test:0", "emulator.example.test:65536", "[::1",
+		                                      "[::1]x", "emulator.example.test ; mine", "[emulator]:18390",
+		                                      "tcp://player@emulator.example.test:18390"})
+			EXPECT_THROW((void)config::parseTarget(target), std::invalid_argument) << target;
 	}
 
 	TEST(HostMap, PicksTheMostSpecificKeyAsDnsComparesNames)
