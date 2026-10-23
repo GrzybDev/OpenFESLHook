@@ -51,7 +51,8 @@ refer to, which does not mean that their owners endorse the hook.
 - Copyright: Copyright 1995-2026 The OpenSSL Project Authors. All Rights Reserved.
 - Package: vcpkg openssl 3.6.5, built with SSLv3 and the weak suites enabled
 - Use: the SSLv3 server the game's FESL connections reach on the player's PC, including its RC4 cipher from the legacy
-  provider, compiled into dinput8.dll.
+  provider, and the TLS of FESL and Theater connections forwarded to servers with tls://, compiled into
+  dinput8.dll.
 
 ## Licence texts
 

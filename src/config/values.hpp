@@ -24,11 +24,12 @@ namespace openfeslhook::config
 	/// @throws std::invalid_argument When the key is neither.
 	[[nodiscard]] std::string parseHostPattern(std::string_view text);
 
-	/// Reads a server to forward to, as "tcp://host[:port]" or "host[:port]"; a server without a port gets port 0,
-	/// which stands for the port the game connected to.
+	/// Reads a server to forward to, as "tcp://host[:port]", "tls://host[:port]" or "host[:port]", which is plain
+	/// TCP; a server without a port gets port 0, which stands for the port the game connected to.
 	/// @param text The value.
+	/// @param verifyCertificates Whether a tls:// server's certificate has to be trusted.
 	/// @throws std::invalid_argument When the value is not a server.
-	[[nodiscard]] net::Target parseTarget(std::string_view text);
+	[[nodiscard]] net::Target parseTarget(std::string_view text, bool verifyCertificates);
 
 	/// Reads a log level by its name: trace, debug, info, warning or error.
 	/// @param text The value.

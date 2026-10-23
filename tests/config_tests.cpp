@@ -50,7 +50,8 @@ BlockUnknownHosts=maybe
 *.theater.example.test:18395=theater
 easo.example.test=ssl
 [Forward]
-*.fesl.example.test=emulator.example.test:18390
+VerifyCertificates=0
+*.fesl.example.test=tls://emulator.example.test:18390
 other.example.test=emulator.example.test
 *.other.example.test=emulator.example.test
 [log]
@@ -66,7 +67,8 @@ Console=1
 		EXPECT_TRUE(settings.blockUnknownHosts);
 		EXPECT_EQ(settings.hosts.entries().size(), 1u);
 		EXPECT_EQ(settings.hosts.find("pc.fesl.example.test"), net::Protocol::Fesl);
-		const net::Target emulator{.host = "emulator.example.test", .port = 18390};
+		const net::Target emulator{.host = "emulator.example.test", .port = 18390,
+		                           .transport = net::Transport::TlsUntrusted};
 		EXPECT_EQ(settings.forwards.find("pc.fesl.example.test"), emulator);
 		EXPECT_TRUE(settings.log.file);
 		EXPECT_FALSE(settings.log.console);
@@ -120,16 +122,23 @@ Console=1
 
 	TEST(ConfigValues, ReadsServersToForwardTo)
 	{
-		EXPECT_EQ(config::parseTarget("192.0.2.5:18395"), (net::Target{.host = "192.0.2.5", .port = 18395}));
-		EXPECT_EQ(config::parseTarget("emulator.example.test"), (net::Target{.host = "emulator.example.test"}));
-		EXPECT_EQ(config::parseTarget("TCP://[::1]:19021"), (net::Target{.host = "::1", .port = 19021}));
-		EXPECT_EQ(config::parseTarget("[::1]"), (net::Target{.host = "::1", .port = 0}));
+		EXPECT_EQ(config::parseTarget("192.0.2.5:18395", true),
+		          (net::Target{.host = "192.0.2.5", .port = 18395, .transport = net::Transport::Plain}));
+		EXPECT_EQ(config::parseTarget("emulator.example.test", true),
+		          (net::Target{.host = "emulator.example.test", .port = 0, .transport = net::Transport::Plain}));
+		EXPECT_EQ(config::parseTarget("tcp://[::1]:19021", true),
+		          (net::Target{.host = "::1", .port = 19021, .transport = net::Transport::Plain}));
+		EXPECT_EQ(config::parseTarget("[::1]", true), (net::Target{.host = "::1", .port = 0}));
+		EXPECT_EQ(config::parseTarget("TLS://emulator.example.test:18390", true),
+		          (net::Target{.host = "emulator.example.test", .port = 18390, .transport = net::Transport::Tls}));
+		EXPECT_EQ(config::parseTarget("tls://emulator.example.test", false),
+		          (net::Target{.host = "emulator.example.test", .port = 0, .transport = net::Transport::TlsUntrusted}));
 
 		for (const std::string_view target : {"udp://emulator.example.test:1", ":18390", "emulator.example.test:",
 		                                      "emulator.example.test:0", "emulator.example.test:65536", "[::1",
 		                                      "[::1]x", "emulator.example.test ; mine", "[emulator]:18390",
 		                                      "tcp://player@emulator.example.test:18390"})
-			EXPECT_THROW((void)config::parseTarget(target), std::invalid_argument) << target;
+			EXPECT_THROW((void)config::parseTarget(target, true), std::invalid_argument) << target;
 	}
 
 	TEST(HostMap, PicksTheMostSpecificKeyAsDnsComparesNames)

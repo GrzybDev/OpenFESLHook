@@ -19,6 +19,8 @@ namespace openfeslhook::platform
 		bool secure = true;
 		std::string host;
 		std::uint16_t port = 443;
+		/// Whether an HTTPS server's certificate has to be trusted and name it.
+		bool verifyCertificates = true;
 	};
 
 	/// Sends the game's HTTP requests over WinHTTP, one after another on a thread of its own, adding the host the game

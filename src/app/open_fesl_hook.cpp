@@ -31,8 +31,9 @@ namespace openfeslhook::app
 
 		std::string describe(const net::Target& target)
 		{
-			return std::format("tcp://{}{}", platform::urlHost(target.host),
-			                   target.port == 0 ? "" : std::format(":{}", target.port));
+			return std::format("{}://{}{}{}", target.transport == net::Transport::Plain ? "tcp" : "tls",
+			                   platform::urlHost(target.host), target.port == 0 ? "" : std::format(":{}", target.port),
+			                   target.transport == net::Transport::TlsUntrusted ? " with any certificate" : "");
 		}
 
 		platform::HttpDestination destination(const relay::ServerAddress& server,
@@ -41,7 +42,12 @@ namespace openfeslhook::app
 			if (!forward)
 				return {.secure = server.secure, .host = server.host, .port = server.port};
 
-			return {.secure = false, .host = forward->host, .port = forward->port};
+			return {
+				.secure = forward->transport != net::Transport::Plain,
+				.host = forward->host,
+				.port = forward->port,
+				.verifyCertificates = forward->transport == net::Transport::Tls,
+			};
 		}
 
 		net::LocalServices* startServices(const relay::ServerAddress& server)

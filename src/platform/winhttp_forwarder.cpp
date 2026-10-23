@@ -59,8 +59,11 @@ namespace openfeslhook::platform
 		if (!destination_.secure)
 			log::debug(log::Topic::Http, "HTTP requests go to http://{}:{}", urlHost(destination_.host),
 			           destination_.port);
-		else
+		else if (destination_.verifyCertificates)
 			log::debug(log::Topic::Http, "HTTP requests go to https://{}:{}, whose certificate has to be trusted",
+			           urlHost(destination_.host), destination_.port);
+		else
+			log::debug(log::Topic::Http, "HTTP requests go to https://{}:{}, accepting any certificate",
 			           urlHost(destination_.host), destination_.port);
 	}
 
@@ -105,6 +108,13 @@ namespace openfeslhook::platform
 		                                                destination_.secure ? WINHTTP_FLAG_SECURE : 0));
 		if (!request)
 			return fail("WinHTTP could not set up the request");
+
+		if (destination_.secure && !destination_.verifyCertificates)
+		{
+			DWORD ignore = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
+			               SECURITY_FLAG_IGNORE_CERT_DATE_INVALID | SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+			WinHttpSetOption(request.get(), WINHTTP_OPTION_SECURITY_FLAGS, &ignore, sizeof(ignore));
+		}
 
 		std::wstring headers;
 		for (const auto& field : game)

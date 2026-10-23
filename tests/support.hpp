@@ -56,6 +56,11 @@ namespace openfeslhook::test
 	std::optional<std::vector<std::uint8_t>> receiveWithin(boost::asio::ip::udp::socket& socket,
 	                                                       boost::asio::ip::udp::endpoint* sender = nullptr);
 
+	/// Makes a TLS 1.2 or later server context with a fresh self-signed certificate, as a server the hook forwards to
+	/// might use.
+	/// @param host The name the certificate is issued to.
+	boost::asio::ssl::context serverContext(std::string_view host);
+
 	struct FakeRelayState;
 
 	/// Stands in for the relay server: every connection a session opens to it is recorded here, in order.

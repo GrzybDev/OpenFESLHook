@@ -197,11 +197,13 @@ namespace openfeslhook::config
 				settings.hosts.add(host, protocol);
 		}
 
+		bool verifyCertificates = true;
+		reader.read("Forward", "VerifyCertificates", verifyCertificates, parseFlag);
 		for (const auto& [host, value] : reader.remaining("Forward"))
 		{
 			try
 			{
-				settings.forwards.add(parseHostPattern(host), parseTarget(value));
+				settings.forwards.add(parseHostPattern(host), parseTarget(value, verifyCertificates));
 			}
 			catch (const std::invalid_argument& problem)
 			{

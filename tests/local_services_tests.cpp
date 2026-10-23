@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <random>
 
+#include <boost/asio/cancel_after.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/asio/write.hpp>
@@ -193,5 +195,74 @@ namespace openfeslhook::test
 		std::array<std::uint8_t, 1> more{};
 		EXPECT_EQ(readWithin(forwarded, boost::asio::buffer(more)), boost::asio::error::eof);
 		EXPECT_EQ(server.connections(), 0u);
+	}
+
+	TEST(LocalServices, ReencryptsForwardedFeslAndChecksTheServersCertificate)
+	{
+		boost::asio::io_context io;
+		boost::asio::ssl::context emulatorTls = serverContext("emulator.example.test");
+		boost::asio::ip::tcp::acceptor emulator(io, {boost::asio::ip::address_v4::loopback(), 0});
+		boost::asio::ssl::context gameTls = gameClientContext("RC4-SHA");
+		const fesl::Packet hello = makePacket("fsys", 0xc0000001, "TXN=Hello\n\0"sv);
+
+		// Starts the game's FESL connection through the hook, then takes the hook's connection to the server.
+		const auto forward = [&](const net::Transport transport, boost::system::error_code& handshake)
+		{
+			FakeRelayServer server;
+			const net::Target target{
+				.host = "127.0.0.1", .port = emulator.local_endpoint().port(), .transport = transport};
+			net::LocalServices services(server.factory());
+			const std::optional<std::uint16_t> port =
+				services.ensure({.protocol = net::Protocol::Fesl, .port = 0}, "game-pc.fesl.example.test", target);
+
+			boost::asio::ssl::stream<boost::asio::ip::tcp::socket> game(io, gameTls);
+			game.lowest_layer().connect({boost::asio::ip::address_v4::loopback(), port.value()});
+			game.handshake(boost::asio::ssl::stream_base::client);
+			boost::asio::write(game, boost::asio::buffer(hello));
+
+			boost::asio::ssl::stream<boost::asio::ip::tcp::socket> forwarded(io, emulatorTls);
+			const auto handshaken = [&](const boost::system::error_code& error) { handshake = error; };
+			const auto accepted = [&](const boost::system::error_code& error)
+			{
+				if (error)
+					handshake = error;
+				else
+					forwarded.async_handshake(boost::asio::ssl::stream_base::server,
+					                          boost::asio::cancel_after(std::chrono::seconds(5), handshaken));
+			};
+			emulator.async_accept(forwarded.lowest_layer(),
+			                      boost::asio::cancel_after(std::chrono::seconds(5), accepted));
+			io.restart();
+			io.run();
+
+			fesl::Packet received(hello.size());
+			if (!handshake)
+			{
+				EXPECT_GE(SSL_version(forwarded.native_handle()), TLS1_2_VERSION);
+				EXPECT_FALSE(readWithin(forwarded, boost::asio::buffer(received)));
+				EXPECT_EQ(received, hello);
+
+				const fesl::Packet reply = makePacket("fsys", 0x80000001, "TXN=Hello\n\0"sv);
+				boost::asio::write(forwarded, boost::asio::buffer(reply));
+				fesl::Packet answered(reply.size());
+				EXPECT_FALSE(readWithin(game, boost::asio::buffer(answered)));
+				EXPECT_EQ(answered, reply);
+			}
+			else
+			{
+				std::array<std::uint8_t, 1> more{};
+				const boost::system::error_code end = readWithin(game, boost::asio::buffer(more));
+				EXPECT_TRUE(end && end != boost::asio::error::timed_out) << end.message();
+			}
+			EXPECT_EQ(server.connections(), 0u);
+		};
+
+		boost::system::error_code trusted;
+		forward(net::Transport::Tls, trusted);
+		EXPECT_TRUE(trusted && trusted != boost::asio::error::operation_aborted) << trusted.message();
+
+		boost::system::error_code untrusted;
+		forward(net::Transport::TlsUntrusted, untrusted);
+		EXPECT_FALSE(untrusted) << untrusted.message();
 	}
 }

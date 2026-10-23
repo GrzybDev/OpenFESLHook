@@ -62,6 +62,7 @@
     <ClInclude Include="src\relay\server_address.hpp" />
     <ClInclude Include="src\relay\session.hpp" />
     <ClInclude Include="src\relay\upstream.hpp" />
+    <ClInclude Include="src\tls\client_tls.hpp" />
     <ClInclude Include="src\tls\game_tls.hpp" />
     <ClInclude Include="src\tls\openssl_error.hpp" />
     <ClInclude Include="src\util\text.hpp" />
@@ -86,6 +87,7 @@
     <ClCompile Include="src\relay\route.cpp" />
     <ClCompile Include="src\relay\server_address.cpp" />
     <ClCompile Include="src\relay\session.cpp" />
+    <ClCompile Include="src\tls\client_tls.cpp" />
     <ClCompile Include="src\tls\game_tls.cpp" />
     <ClCompile Include="src\tls\openssl_error.cpp" />
     <ClCompile Include="src\util\text.cpp" />

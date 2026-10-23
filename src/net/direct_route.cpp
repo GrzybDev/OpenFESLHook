@@ -2,6 +2,7 @@
 #include "direct_route.hpp"
 
 #include "logging/log.hpp"
+#include "tls/client_tls.hpp"
 
 namespace openfeslhook::net
 {
@@ -21,13 +22,22 @@ namespace openfeslhook::net
 		virtual void close() = 0;
 	};
 
-	class DirectRoute::StreamLink final : public Link, public std::enable_shared_from_this<StreamLink>
+	namespace
+	{
+		using TlsStream = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
+
+		template <typename Stream>
+		constexpr bool kUsesTls = std::is_same_v<Stream, TlsStream>;
+	}
+
+	template <typename Stream>
+	class DirectRoute::StreamLink final : public Link, public std::enable_shared_from_this<StreamLink<Stream>>
 	{
 	public:
-		StreamLink(boost::asio::io_context& io, Target target, std::weak_ptr<DirectRoute> route, const Key key,
-		           std::weak_ptr<relay::Endpoint> endpoint)
-			: socket_(io), resolver_(io), target_(std::move(target)), route_(std::move(route)), key_(key),
-			  endpoint_(std::move(endpoint))
+		StreamLink(boost::asio::io_context& io, Target target, std::shared_ptr<boost::asio::ssl::context> tls,
+		           std::weak_ptr<DirectRoute> route, const Key key, std::weak_ptr<relay::Endpoint> endpoint)
+			: tls_(std::move(tls)), stream_(makeStream(io, tls_.get())), resolver_(io), target_(std::move(target)),
+			  route_(std::move(route)), key_(key), endpoint_(std::move(endpoint))
 		{
 		}
 
@@ -35,8 +45,8 @@ namespace openfeslhook::net
 		{
 			using Results = boost::asio::ip::tcp::resolver::results_type;
 			resolver_.async_resolve(target_.host, std::to_string(target_.port),
-			                        [self = shared_from_this()](const boost::system::error_code& error,
-			                                                    const Results& results)
+			                        [self = this->shared_from_this()](const boost::system::error_code& error,
+			                                                          const Results& results)
 			{
 				if (self->closed_)
 					return;
@@ -47,7 +57,7 @@ namespace openfeslhook::net
 					return;
 				}
 
-				boost::asio::async_connect(self->socket_, results,
+				boost::asio::async_connect(self->stream_.lowest_layer(), results,
 				                           [self](const boost::system::error_code& connectError,
 				                                  const boost::asio::ip::tcp::endpoint& server)
 				{
@@ -63,7 +73,7 @@ namespace openfeslhook::net
 					log::debug(relay::channelTopic(self->key_.channel), "{} #{} connected to {}:{} at {} port {}",
 					           relay::channelName(self->key_.channel), self->key_.connection, self->target_.host,
 					           self->target_.port, server.address().to_string(), server.port());
-					self->connected();
+					self->secure();
 				});
 			});
 		}
@@ -81,12 +91,13 @@ namespace openfeslhook::net
 			boost::system::error_code ignored;
 			resolver_.cancel();
 			// Shut down first, so that the server sees the connection end rather than reset.
-			socket_.shutdown(boost::asio::socket_base::shutdown_both, ignored);
-			socket_.close(ignored);
+			stream_.lowest_layer().shutdown(boost::asio::socket_base::shutdown_both, ignored);
+			stream_.lowest_layer().close(ignored);
 		}
 
 	private:
-		boost::asio::ip::tcp::socket socket_;
+		std::shared_ptr<boost::asio::ssl::context> tls_;
+		Stream stream_;
 		boost::asio::ip::tcp::resolver resolver_;
 		Target target_;
 		std::string from_ = std::format("from {}:{}", target_.host, target_.port);
@@ -98,6 +109,50 @@ namespace openfeslhook::net
 		std::deque<fesl::Packet> writes_;
 		bool connected_ = false;
 		bool closed_ = false;
+
+		static Stream makeStream(boost::asio::io_context& io, boost::asio::ssl::context* context)
+		{
+			if constexpr (kUsesTls<Stream>)
+				return Stream(io, *context);
+			else
+				return Stream(io);
+		}
+
+		void secure()
+		{
+			if constexpr (kUsesTls<Stream>)
+			{
+				boost::system::error_code notAddress;
+				(void)boost::asio::ip::make_address(target_.host, notAddress);
+				// Server names are only sent for host names; an address is not one.
+				if (notAddress && !SSL_set_tlsext_host_name(stream_.native_handle(), target_.host.c_str()))
+				{
+					end("OpenSSL could not set the server name");
+					return;
+				}
+
+				if (target_.transport == Transport::Tls)
+					stream_.set_verify_callback(boost::asio::ssl::host_name_verification(target_.host));
+				stream_.async_handshake(boost::asio::ssl::stream_base::client,
+				                        [self = this->shared_from_this()](const boost::system::error_code& error)
+				{
+					if (error)
+					{
+						self->end(error.message());
+						return;
+					}
+
+					SSL* const ssl = self->stream_.native_handle();
+					log::debug(relay::channelTopic(self->key_.channel), "{} #{} to {}:{} chose {} with {}",
+					           relay::channelName(self->key_.channel), self->key_.connection, self->target_.host,
+					           self->target_.port, SSL_get_version(ssl),
+					           SSL_CIPHER_get_name(SSL_get_current_cipher(ssl)));
+					self->connected();
+				});
+			}
+			else
+				connected();
+		}
 
 		void connected()
 		{
@@ -112,16 +167,18 @@ namespace openfeslhook::net
 
 		void read()
 		{
-			socket_.async_read_some(boost::asio::buffer(buffer_),
-			                        [self = shared_from_this()](const boost::system::error_code& error,
-			                                                    const std::size_t size)
+			stream_.async_read_some(boost::asio::buffer(buffer_),
+			                        [self = this->shared_from_this()](const boost::system::error_code& error,
+			                                                          const std::size_t size)
 			{
 				if (self->closed_)
 					return;
 
 				if (error)
 				{
-					self->end(error == boost::asio::error::eof ? std::string() : error.message());
+					const bool orderly = error == boost::asio::error::eof ||
+					                     error == boost::asio::ssl::error::stream_truncated;
+					self->end(orderly ? std::string() : error.message());
 					return;
 				}
 
@@ -146,8 +203,9 @@ namespace openfeslhook::net
 
 		void write()
 		{
-			boost::asio::async_write(socket_, boost::asio::buffer(writes_.front()),
-			                         [self = shared_from_this()](const boost::system::error_code& error, std::size_t)
+			boost::asio::async_write(stream_, boost::asio::buffer(writes_.front()),
+			                         [self = this->shared_from_this()](const boost::system::error_code& error,
+			                                                           std::size_t)
 			{
 				if (self->closed_)
 					return;
@@ -306,6 +364,9 @@ namespace openfeslhook::net
 	DirectRoute::DirectRoute(boost::asio::io_context& io, Target target)
 		: io_(io), target_(std::move(target)), to_(std::format("to {}:{}", target_.host, target_.port))
 	{
+		if (target_.transport != Transport::Plain)
+			tls_ = std::make_shared<boost::asio::ssl::context>(
+				tls::clientContext(target_.transport == Transport::Tls));
 	}
 
 	std::optional<std::uint16_t> DirectRoute::attach(const relay::Channel channel, const relay::OpenBody& ports,
@@ -326,8 +387,12 @@ namespace openfeslhook::net
 		std::shared_ptr<Link> link;
 		if (channel == relay::Channel::TheaterDatagram)
 			link = std::make_shared<DatagramLink>(io_, target_, weak_from_this(), key, std::move(endpoint));
+		else if (tls_)
+			link = std::make_shared<StreamLink<TlsStream>>(io_, target_, tls_, weak_from_this(), key,
+			                                               std::move(endpoint));
 		else
-			link = std::make_shared<StreamLink>(io_, target_, weak_from_this(), key, std::move(endpoint));
+			link = std::make_shared<StreamLink<boost::asio::ip::tcp::socket>>(io_, target_, nullptr, weak_from_this(),
+			                                                                 key, std::move(endpoint));
 		links_.emplace(key, link);
 		log::write(relay::openingLevel(channel), relay::channelTopic(channel),
 		           "{} #{} for {} from port {} goes to {}:{}", relay::channelName(channel), *connection, ports.host,

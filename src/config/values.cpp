@@ -41,14 +41,17 @@ namespace openfeslhook::config
 		return std::string(text);
 	}
 
-	net::Target parseTarget(const std::string_view text)
+	net::Target parseTarget(const std::string_view text, const bool verifyCertificates)
 	{
 		net::Target target;
 		std::string_view rest = text;
 		if (const std::size_t scheme = text.find("://"); scheme != std::string_view::npos)
 		{
-			if (!boost::algorithm::iequals(text.substr(0, scheme), "tcp"))
-				throw std::invalid_argument(std::format("\"{}\" is not tcp://", text));
+			const std::string_view name = text.substr(0, scheme);
+			if (boost::algorithm::iequals(name, "tls"))
+				target.transport = verifyCertificates ? net::Transport::Tls : net::Transport::TlsUntrusted;
+			else if (!boost::algorithm::iequals(name, "tcp"))
+				throw std::invalid_argument(std::format("\"{}\" is neither tcp:// nor tls://", text));
 			rest = text.substr(scheme + 3);
 		}
 

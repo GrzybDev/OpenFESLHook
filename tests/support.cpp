@@ -9,6 +9,7 @@
 #include <boost/endian/conversion.hpp>
 #include <openssl/provider.h>
 #include <openssl/ssl.h>
+#include <openssl/x509.h>
 
 namespace openfeslhook::test
 {
@@ -113,6 +114,31 @@ namespace openfeslhook::test
 			*sender = from;
 		datagram.resize(*received);
 		return datagram;
+	}
+
+	boost::asio::ssl::context serverContext(const std::string_view host)
+	{
+		boost::asio::ssl::context context(boost::asio::ssl::context::tls_server);
+		context.set_options(boost::asio::ssl::context::no_tlsv1 | boost::asio::ssl::context::no_tlsv1_1);
+		EVP_PKEY* const key = EVP_RSA_gen(2048);
+		X509* const certificate = X509_new();
+		X509_NAME* const name = X509_get_subject_name(certificate);
+		const bool made = key && certificate && X509_set_version(certificate, X509_VERSION_3) &&
+		                  ASN1_INTEGER_set(X509_get_serialNumber(certificate), 1) &&
+		                  X509_gmtime_adj(X509_getm_notBefore(certificate), -60) &&
+		                  X509_gmtime_adj(X509_getm_notAfter(certificate), 60L * 60) &&
+		                  X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_UTF8,
+		                                             reinterpret_cast<const unsigned char*>(host.data()),
+		                                             static_cast<int>(host.size()), -1, 0) &&
+		                  X509_set_issuer_name(certificate, name) && X509_set_pubkey(certificate, key) &&
+		                  X509_sign(certificate, key, EVP_sha256()) &&
+		                  SSL_CTX_use_certificate(context.native_handle(), certificate) == 1 &&
+		                  SSL_CTX_use_PrivateKey(context.native_handle(), key) == 1;
+		X509_free(certificate);
+		EVP_PKEY_free(key);
+		if (!made)
+			throw std::runtime_error("OpenSSL could not make the test server's certificate");
+		return context;
 	}
 
 	FakeRelayServer::FakeRelayServer() : state_(std::make_shared<FakeRelayState>())
