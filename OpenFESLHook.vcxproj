@@ -48,15 +48,20 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>src\exports.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\version.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\direct_input.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\exports.def" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="OpenFESLHook.Core.vcxproj">
