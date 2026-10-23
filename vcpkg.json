@@ -1,5 +1,9 @@
 {
   "dependencies": [
+    "boost-algorithm",
+    "boost-asio",
+    "boost-beast",
+    "boost-endian",
     "gtest"
   ]
 }
