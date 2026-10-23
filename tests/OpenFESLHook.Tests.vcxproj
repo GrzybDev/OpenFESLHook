@@ -42,6 +42,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="frame_tests.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="packet_tests.cpp" />
     <ClCompile Include="support.cpp" />

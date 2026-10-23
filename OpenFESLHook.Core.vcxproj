@@ -45,12 +45,14 @@
   <ItemGroup>
     <ClInclude Include="src\fesl\packet.hpp" />
     <ClInclude Include="src\pch.hpp" />
+    <ClInclude Include="src\relay\frame.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\fesl\packet.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\relay\frame.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
