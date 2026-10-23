@@ -20,11 +20,19 @@ namespace openfeslhook::platform
 	/// Owns a WinHTTP handle.
 	using InternetHandle = std::unique_ptr<void, InternetHandleCloser>;
 
-	/// Opens an asynchronous WinHTTP session for the hook's connections, whose calls report their results to a status
-	/// callback, which follows the system's proxy settings and allows TLS 1.2 and, where Windows has it, 1.3.
+	/// Whether a WinHTTP session's calls wait for their results or report them to a status callback.
+	enum class SessionMode
+	{
+		Synchronous,
+		Asynchronous,
+	};
+
+	/// Opens a WinHTTP session for the hook's connections, which follows the system's proxy settings and allows TLS 1.2
+	/// and, where Windows has it, 1.3.
 	/// @param userAgent The User-Agent of its requests.
+	/// @param mode Whether its calls wait or report.
 	/// @throws std::runtime_error When WinHTTP cannot open it.
-	[[nodiscard]] InternetHandle openSession(std::wstring_view userAgent);
+	[[nodiscard]] InternetHandle openSession(std::wstring_view userAgent, SessionMode mode);
 
 	/// Writes a host as URLs and WinHTTP's calls need it, with an IPv6 address in brackets.
 	/// @param host A host name or address without brackets.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -10,6 +11,7 @@
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/io_context.hpp>
 
+#include "http/forwarder.hpp"
 #include "net/listener.hpp"
 #include "net/service.hpp"
 #include "relay/session.hpp"
@@ -17,14 +19,18 @@
 
 namespace openfeslhook::net
 {
+	/// Makes the forwarder of an HTTP listener, to the relay server's host.
+	using HttpForwarders = std::function<std::shared_ptr<http::Forwarder>()>;
+
 	/// The local listeners the game is sent to, started when first needed, and the thread they and their connections
 	/// run on.
 	class LocalServices
 	{
 	public:
 		/// Starts the thread.
-		/// @param upstream Makes the connections to the relay server, which every service uses.
-		explicit LocalServices(relay::UpstreamFactory upstream);
+		/// @param upstream Makes the connections to the relay server, which the FESL and Theater services use.
+		/// @param http Makes the forwarders of HTTP listeners.
+		explicit LocalServices(relay::UpstreamFactory upstream, HttpForwarders http = {});
 
 		/// Stops every listener and connection and waits for the thread.
 		~LocalServices();
@@ -42,12 +48,14 @@ namespace openfeslhook::net
 		boost::asio::io_context io_;
 		boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_;
 		std::shared_ptr<relay::Session> session_;
+		HttpForwarders http_;
 		std::map<Service, std::uint16_t> ports_;
 		std::thread thread_;
 
 		std::optional<std::uint16_t> listen(const Service& service, std::string_view host);
 		std::shared_ptr<Listener> listenForFesl(const Service& service, std::string_view host);
 		std::shared_ptr<Listener> listenForTheater(const Service& service, std::string_view host);
+		std::shared_ptr<Listener> listenForHttp(const Service& service, std::string_view host);
 		void run();
 	};
 }

@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -33,6 +34,8 @@
 // Boost.Asio includes the Winsock headers, which must come before windows.h.
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>

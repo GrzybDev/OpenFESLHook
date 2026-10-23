@@ -45,9 +45,11 @@
   <ItemGroup>
     <ClInclude Include="src\config\values.hpp" />
     <ClInclude Include="src\fesl\packet.hpp" />
+    <ClInclude Include="src\http\forwarder.hpp" />
     <ClInclude Include="src\http\masking.hpp" />
     <ClInclude Include="src\logging\log.hpp" />
     <ClInclude Include="src\net\datagram_relay.hpp" />
+    <ClInclude Include="src\net\http_connection.hpp" />
     <ClInclude Include="src\net\listener.hpp" />
     <ClInclude Include="src\net\local_services.hpp" />
     <ClInclude Include="src\net\service.hpp" />
@@ -67,6 +69,7 @@
     <ClCompile Include="src\http\masking.cpp" />
     <ClCompile Include="src\logging\log.cpp" />
     <ClCompile Include="src\net\datagram_relay.cpp" />
+    <ClCompile Include="src\net\http_connection.cpp" />
     <ClCompile Include="src\net\listener.cpp" />
     <ClCompile Include="src\net\local_services.cpp" />
     <ClCompile Include="src\net\service.cpp" />

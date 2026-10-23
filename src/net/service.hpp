@@ -16,6 +16,8 @@ namespace openfeslhook::net
 		Fesl,
 		/// Theater over TCP, and its datagrams over UDP on the same port.
 		Theater,
+		/// HTTP, which games fetch their configuration and stored files with.
+		Http,
 	};
 
 	/// A local listener that the game's look-ups and connections lead to.
@@ -40,6 +42,8 @@ namespace openfeslhook::net
 			return "fesl";
 		case Protocol::Theater:
 			return "theater";
+		case Protocol::Http:
+			return "http";
 		}
 		return "unknown";
 	}
@@ -54,6 +58,8 @@ namespace openfeslhook::net
 			return log::Topic::Fesl;
 		case Protocol::Theater:
 			return log::Topic::Theater;
+		case Protocol::Http:
+			return log::Topic::Http;
 		}
 		return log::Topic::Hook;
 	}

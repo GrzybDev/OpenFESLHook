@@ -29,6 +29,8 @@ namespace openfeslhook::log
 		Fesl,
 		/// Theater listeners, connections, datagrams and their packets.
 		Theater,
+		/// HTTP listeners, requests and their forwarding.
+		Http,
 		/// The WebSocket to the relay server.
 		Relay,
 	};
@@ -45,6 +47,8 @@ namespace openfeslhook::log
 			return "FESL";
 		case Topic::Theater:
 			return "Theater";
+		case Topic::Http:
+			return "HTTP";
 		case Topic::Relay:
 			return "Relay";
 		default:
@@ -92,7 +96,7 @@ namespace openfeslhook::log
 		}
 	}
 
-	/// Formats and writes a line with the finest details.
+	/// Formats and writes a line with the finest details, such as HTTP headers.
 	/// @param topic What the line is about.
 	/// @param format The line's format.
 	/// @param args What the format fills in.

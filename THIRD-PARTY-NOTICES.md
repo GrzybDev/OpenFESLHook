@@ -25,7 +25,8 @@ refer to, which does not mean that their owners endorse the hook.
   Peter Dimov 2019 (Boost.Endian), Copyright Pavol Droba 2002-2003 (Boost.Algorithm), and the authors of the Boost
   libraries they build on
 - Packages: vcpkg boost-algorithm 1.92.0, boost-asio 1.92.0, boost-beast 1.92.0, boost-endian 1.92.0, boost-url 1.92.0
-- Use: the hook's sockets and their event loop (Boost.Asio), the buffer that gathers the bytes of game packets
+- Use: the hook's sockets, their event loop and the thread that forwards HTTP requests (Boost.Asio), reading and writing
+  the game's HTTP requests, reading the heads of the forwarded responses and gathering the bytes of game packets
   (Boost.Beast), reading server addresses and the queries of request targets (Boost.URL), the big-endian numbers of
   packets and relay frames (Boost.Endian), comparing names regardless of case (Boost.Algorithm) and the Boost libraries
   they build on, compiled into dinput8.dll.

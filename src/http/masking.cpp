@@ -7,6 +7,23 @@
 
 namespace openfeslhook::http
 {
+	namespace
+	{
+		bool isSecretHeader(const boost::beast::http::field name)
+		{
+			switch (name)
+			{
+			case boost::beast::http::field::authorization:
+			case boost::beast::http::field::cookie:
+			case boost::beast::http::field::proxy_authorization:
+			case boost::beast::http::field::set_cookie:
+				return true;
+			default:
+				return false;
+			}
+		}
+	}
+
 	std::string maskTarget(const std::string_view target)
 	{
 		const boost::system::result<boost::urls::url_view> url = boost::urls::parse_uri_reference(target);
@@ -39,5 +56,22 @@ namespace openfeslhook::http
 		if (url->has_fragment())
 			masked.append("#").append(url->encoded_fragment());
 		return masked;
+	}
+
+	std::string describeHeaders(const boost::beast::http::fields& headers)
+	{
+		std::string text;
+		for (const auto& field : headers)
+		{
+			if (!text.empty())
+				text += ", ";
+
+			text.append(field.name_string()).append(": ");
+			if (isSecretHeader(field.name()))
+				text += "***";
+			else
+				text += field.value();
+		}
+		return text;
 	}
 }

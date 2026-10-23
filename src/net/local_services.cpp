@@ -3,14 +3,15 @@
 
 #include "logging/log.hpp"
 #include "net/datagram_relay.hpp"
+#include "net/http_connection.hpp"
 #include "net/stream_connection.hpp"
 #include "tls/game_tls.hpp"
 
 namespace openfeslhook::net
 {
-	LocalServices::LocalServices(relay::UpstreamFactory upstream)
+	LocalServices::LocalServices(relay::UpstreamFactory upstream, HttpForwarders http)
 		: work_(io_.get_executor()),
-		  session_(std::make_shared<relay::Session>(io_.get_executor(), std::move(upstream))),
+		  session_(std::make_shared<relay::Session>(io_.get_executor(), std::move(upstream))), http_(std::move(http)),
 		  thread_([this] { run(); })
 	{
 	}
@@ -45,6 +46,9 @@ namespace openfeslhook::net
 				break;
 			case Protocol::Theater:
 				listener = listenForTheater(service, host);
+				break;
+			case Protocol::Http:
+				listener = listenForHttp(service, host);
 				break;
 			}
 
@@ -106,6 +110,19 @@ namespace openfeslhook::net
 				           port, host, problem.what());
 			}
 		}
+	}
+
+	std::shared_ptr<Listener> LocalServices::listenForHttp(const Service& service, const std::string_view host)
+	{
+		std::shared_ptr<http::Forwarder> forwarder = http_ ? http_() : nullptr;
+		if (!forwarder)
+			throw std::runtime_error("nothing can forward HTTP requests");
+
+		return Listener::start(io_, service, host,
+		                       [forwarder = std::move(forwarder)](boost::asio::ip::tcp::socket socket)
+		{
+			std::make_shared<HttpConnection>(std::move(socket), forwarder)->start();
+		});
 	}
 
 	void LocalServices::run()

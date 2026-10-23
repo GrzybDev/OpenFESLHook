@@ -10,10 +10,11 @@ namespace openfeslhook::platform
 		WinHttpCloseHandle(handle);
 	}
 
-	InternetHandle openSession(const std::wstring_view userAgent)
+	InternetHandle openSession(const std::wstring_view userAgent, const SessionMode mode)
 	{
 		InternetHandle session(WinHttpOpen(std::wstring(userAgent).c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-		                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC));
+		                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS,
+		                                   mode == SessionMode::Asynchronous ? WINHTTP_FLAG_ASYNC : 0));
 		if (!session)
 			throw std::runtime_error(std::format("WinHTTP could not open a session: {}", errorText(GetLastError())));
 
