@@ -1,0 +1,8 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="OpenFESLHook.vcxproj" Id="66fa5673-1364-4d2b-9278-2c3e2d0a793f" />
+  <Project Path="OpenFESLHook.Core.vcxproj" Id="4ba7af15-92e5-4652-bf32-464fcc0935be" />
+  <Project Path="tests/OpenFESLHook.Tests.vcxproj" Id="5c453fd3-f2ff-410c-8fc2-7daa67355821" />
+</Solution>
