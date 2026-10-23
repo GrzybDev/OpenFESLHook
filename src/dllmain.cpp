@@ -1,0 +1,32 @@
+#include "pch.hpp"
+
+#include "app/open_fesl_hook.hpp"
+
+namespace
+{
+	DWORD WINAPI startHook(LPVOID /*parameter*/)
+	{
+		openfeslhook::app::start();
+		return 0;
+	}
+}
+
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+BOOL APIENTRY DllMain(HMODULE /*module*/, const DWORD reason, LPVOID /*reserved*/)
+{
+	// Thread notifications stay enabled, since the static CRT needs them.
+	if (reason != DLL_PROCESS_ATTACH)
+		return TRUE;
+
+	// DllMain runs under the loader lock, so the hook starts on a thread of its own; the game looks up its servers
+	// only once it is running.
+	if (const HANDLE thread = CreateThread(nullptr, 0, startHook, nullptr, 0, nullptr))
+	{
+		CloseHandle(thread);
+		return TRUE;
+	}
+
+	// User32 must not be used under the loader lock, so the loader reports the failed start instead of a dialog.
+	OutputDebugStringA(std::format("OpenFESLHook could not create its thread (error {})", GetLastError()).c_str());
+	return FALSE;
+}

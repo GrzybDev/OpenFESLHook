@@ -61,4 +61,10 @@ namespace openfeslhook::net
 	/// Names a service by its protocol, address and port, such as "fesl on 127.0.0.1:18390", for the log.
 	/// @param service The service.
 	[[nodiscard]] std::string describe(const Service& service);
+
+	/// Picks the loopback address that the look-ups of a host are answered with, the same for every spelling of the
+	/// name and in practice different for each host, so that each host's listeners get ports of their own.
+	/// @param host The host name.
+	/// @return An address in 127.0.0.0/8 other than 127.0.0.1, in host byte order.
+	[[nodiscard]] std::uint32_t loopbackAddressFor(std::string_view host);
 }

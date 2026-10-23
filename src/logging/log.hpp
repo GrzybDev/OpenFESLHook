@@ -23,6 +23,8 @@ namespace openfeslhook::log
 	{
 		/// The hook's start, its settings and its log.
 		Hook,
+		/// The game's look-ups of host names and its connections to the addresses the hook hands out.
+		Dns,
 		/// FESL listeners, connections, their TLS and their packets.
 		Fesl,
 		/// Theater listeners, connections, datagrams and their packets.
@@ -37,6 +39,8 @@ namespace openfeslhook::log
 	{
 		switch (topic)
 		{
+		case Topic::Dns:
+			return "DNS";
 		case Topic::Fesl:
 			return "FESL";
 		case Topic::Theater:
@@ -77,7 +81,8 @@ namespace openfeslhook::log
 		if (!enabled(level))
 			return;
 
-		// No line is worth an exception in the code that writes it.
+		// Lines are also written from inside the game's calls, which must never see an exception, and no line is
+		// worth one.
 		try
 		{
 			writeLine(level, topic, std::format(format, std::forward<Args>(args)...));

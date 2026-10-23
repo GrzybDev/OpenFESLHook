@@ -38,12 +38,14 @@
   </ImportGroup>
   <PropertyGroup>
     <TargetName>dinput8</TargetName>
+    <!-- The relay server the hook uses; a build may pass its own. -->
+    <OpenFESLHookServerUrl Condition="'$(OpenFESLHookServerUrl)' == ''">wss://fesl.grzyb.app</OpenFESLHookServerUrl>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
-      <PreprocessorDefinitions>_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_USRDLL;OPENFESLHOOK_SERVER_URL="$(OpenFESLHookServerUrl)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -53,16 +55,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\app\open_fesl_hook.hpp" />
+    <ClInclude Include="src\platform\host_redirect.hpp" />
     <ClInclude Include="src\platform\text.hpp" />
     <ClInclude Include="src\platform\winhttp.hpp" />
     <ClInclude Include="src\platform\winhttp_link.hpp" />
     <ClInclude Include="src\version.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\app\open_fesl_hook.cpp" />
     <ClCompile Include="src\direct_input.cpp" />
+    <ClCompile Include="src\dllmain.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\platform\host_redirect.cpp" />
     <ClCompile Include="src\platform\text.cpp" />
     <ClCompile Include="src\platform\winhttp.cpp" />
     <ClCompile Include="src\platform\winhttp_link.cpp" />
@@ -77,4 +84,7 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CheckServerUrl" BeforeTargets="ClCompile">
+    <Error Condition="!$(OpenFESLHookServerUrl.StartsWith('ws://')) And !$(OpenFESLHookServerUrl.StartsWith('wss://'))" Text="OpenFESLHookServerUrl must be a ws:// or wss:// address, not $(OpenFESLHookServerUrl)" />
+  </Target>
 </Project>

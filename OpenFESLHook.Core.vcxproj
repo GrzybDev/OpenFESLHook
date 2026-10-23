@@ -43,6 +43,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\config\values.hpp" />
     <ClInclude Include="src\fesl\packet.hpp" />
     <ClInclude Include="src\http\masking.hpp" />
     <ClInclude Include="src\logging\log.hpp" />
