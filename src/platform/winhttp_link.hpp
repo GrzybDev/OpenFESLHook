@@ -5,20 +5,23 @@
 #include <vector>
 
 #include "platform/winhttp.hpp"
+#include "relay/ipv4_preference.hpp"
 #include "relay/server_address.hpp"
 #include "relay/upstream.hpp"
 
 namespace openfeslhook::platform
 {
 	/// A connection to the relay server over a WinHTTP WebSocket, which brings Windows' own TLS, certificate store and
-	/// proxy settings; every WinHTTP call returns at once and reports its result to a status callback.
+	/// proxy settings; every WinHTTP call returns at once and reports its result to a status callback, and a request
+	/// that cannot be sent over IPv4 is sent again at once over every address family.
 	class WinHttpLink final : public relay::Upstream
 	{
 	public:
 		/// Prepares a connection to the relay server, which open starts.
 		/// @param session An asynchronous WinHTTP session, which must outlive the link.
 		/// @param address The relay server.
-		WinHttpLink(HINTERNET session, relay::ServerAddress address);
+		/// @param ipv4 Whether the relay server is looked up for IPv4 addresses only, which must outlive the link.
+		WinHttpLink(HINTERNET session, relay::ServerAddress address, relay::Ipv4Preference& ipv4);
 
 		/// Closes the connection; what WinHTTP reports for it afterwards is dropped.
 		~WinHttpLink() override;

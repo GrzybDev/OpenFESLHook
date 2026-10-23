@@ -7,6 +7,8 @@
 #include <windows.h>
 #include <winhttp.h>
 
+#include "relay/ipv4_preference.hpp"
+
 namespace openfeslhook::platform
 {
 	/// Closes a WinHTTP handle.
@@ -41,4 +43,11 @@ namespace openfeslhook::platform
 	/// Describes a Windows or WinHTTP error code.
 	/// @param code The code.
 	[[nodiscard]] std::string errorText(DWORD code);
+
+	/// Ends a send over every address family that followed a failed one over IPv4: IPv4 is given up when the request
+	/// got through over IPv6, and preferred again otherwise.
+	/// @param ipv4 The preference that was suspended for the send.
+	/// @param sent The request when it got through, or nullptr.
+	/// @param reason Why sending over IPv4 failed.
+	void endIpv4Retry(relay::Ipv4Preference& ipv4, HINTERNET sent, std::string_view reason);
 }

@@ -53,8 +53,8 @@ namespace openfeslhook::platform
 		}
 	}
 
-	WinHttpForwarder::WinHttpForwarder(HINTERNET session, HttpDestination destination)
-		: session_(session), destination_(std::move(destination))
+	WinHttpForwarder::WinHttpForwarder(HINTERNET session, HttpDestination destination, relay::Ipv4Preference& ipv4)
+		: session_(session), destination_(std::move(destination)), ipv4_(ipv4)
 	{
 		if (!destination_.secure)
 			log::debug(log::Topic::Http, "HTTP requests go to http://{}:{}", urlHost(destination_.host),
@@ -91,13 +91,14 @@ namespace openfeslhook::platform
 		const std::string where = std::format("{}://{}:{}{}", destination_.secure ? "https" : "http",
 		                                      urlHost(destination_.host), destination_.port,
 		                                      http::maskTarget(game.target()));
-		const auto fail = [&](const std::string_view what)
+		const auto fail = [&](const std::string_view what, const DWORD error = GetLastError())
 		{
 			log::warning(log::Topic::Http, "Forwarding HTTP {} to {} failed, since {}: {}", game.method_string(),
-			             where, what, errorText(GetLastError()));
+			             where, what, errorText(error));
 			return std::nullopt;
 		};
 
+		const bool overIpv4 = ipv4_.restricts(destination_.host);
 		const InternetHandle connection(WinHttpConnect(session_, widen(urlHost(destination_.host)).c_str(),
 		                                               destination_.port, 0));
 		if (!connection)
@@ -126,11 +127,33 @@ namespace openfeslhook::platform
 			headers += std::format(L"X-OpenFESL-Host: {}\r\n", widen(host->value()));
 
 		const std::string& body = game.body();
-		if (!WinHttpSendRequest(request.get(), headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
-		                        static_cast<DWORD>(-1),
-		                        body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()),
-		                        static_cast<DWORD>(body.size()), static_cast<DWORD>(body.size()), 0) ||
-		    !WinHttpReceiveResponse(request.get(), nullptr))
+		const auto sendRequest = [&]
+		{
+			return WinHttpSendRequest(request.get(), headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
+			                          static_cast<DWORD>(-1),
+			                          body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()),
+			                          static_cast<DWORD>(body.size()), static_cast<DWORD>(body.size()), 0) != FALSE;
+		};
+		if (!sendRequest())
+		{
+			if (!overIpv4)
+				return fail("the server could not be reached");
+
+			// Windows would have tried every address family by itself, and WinHTTP sends a request again on the same
+			// handle, looking the server up anew.
+			const std::string reason = errorText(GetLastError());
+			ipv4_.suspend();
+			log::debug(log::Topic::Http,
+			           "Forwarding HTTP {} to {} again over every address family, since sending it over IPv4 "
+			           "failed: {}",
+			           game.method_string(), where, reason);
+			const bool sent = sendRequest();
+			const DWORD error = GetLastError();
+			endIpv4Retry(ipv4_, sent ? request.get() : nullptr, reason);
+			if (!sent)
+				return fail("the server could not be reached", error);
+		}
+		if (!WinHttpReceiveResponse(request.get(), nullptr))
 			return fail("the server could not be reached");
 
 		const std::string head = narrow(queryText(request.get(), WINHTTP_QUERY_RAW_HEADERS_CRLF));

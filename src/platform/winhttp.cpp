@@ -46,4 +46,16 @@ namespace openfeslhook::platform
 		text = text.substr(0, text.find_last_not_of(L"\r\n.") + 1);
 		return text.empty() ? std::format("error {}", code) : std::format("{} (error {})", narrow(text), code);
 	}
+
+	void endIpv4Retry(relay::Ipv4Preference& ipv4, HINTERNET const sent, const std::string_view reason)
+	{
+		// A request that got through over IPv4 after all shows that IPv4 works.
+		WINHTTP_CONNECTION_INFO connection{.cbSize = sizeof(connection)};
+		DWORD size = sizeof(connection);
+		if (sent && WinHttpQueryOption(sent, WINHTTP_OPTION_CONNECTION_INFO, &connection, &size) &&
+		    connection.RemoteAddress.ss_family == AF_INET6)
+			ipv4.confirm(reason);
+		else
+			ipv4.resume();
+	}
 }

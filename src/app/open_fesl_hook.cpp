@@ -7,10 +7,12 @@
 #include "logging/log.hpp"
 #include "net/local_services.hpp"
 #include "platform/host_redirect.hpp"
+#include "platform/ipv4_look_ups.hpp"
 #include "platform/text.hpp"
 #include "platform/winhttp.hpp"
 #include "platform/winhttp_forwarder.hpp"
 #include "platform/winhttp_link.hpp"
+#include "relay/ipv4_preference.hpp"
 #include "resource.h"
 #include "version.hpp"
 
@@ -50,7 +52,7 @@ namespace openfeslhook::app
 			};
 		}
 
-		net::LocalServices* startServices(const relay::ServerAddress& server)
+		net::LocalServices* startServices(const relay::ServerAddress& server, relay::Ipv4Preference& ipv4)
 		{
 			const std::wstring userAgent = platform::widen(std::format("OpenFESLHook/{} (Windows)", kVersion));
 			using platform::SessionMode;
@@ -61,10 +63,13 @@ namespace openfeslhook::app
 
 			// Never destroyed: the process may end while its threads run, when nothing may wait for them.
 			return new net::LocalServices(
-				[webSockets, server] { return std::make_unique<platform::WinHttpLink>(webSockets, server); },
-				[session, server](const std::optional<net::Target>& forward)
+				[webSockets, server, &ipv4]
 				{
-					return std::make_shared<platform::WinHttpForwarder>(session, destination(server, forward));
+					return std::make_unique<platform::WinHttpLink>(webSockets, server, ipv4);
+				},
+				[session, server, &ipv4](const std::optional<net::Target>& forward)
+				{
+					return std::make_shared<platform::WinHttpForwarder>(session, destination(server, forward), ipv4);
 				});
 		}
 
@@ -119,7 +124,26 @@ namespace openfeslhook::app
 			for (const std::string& problem : problems)
 				log::warning(log::Topic::Hook, "{}", problem);
 
-			net::LocalServices* const services = startServices(settings.server);
+			// Never destroyed, like the detour and the connections that read it.
+			auto* const ipv4 = new relay::Ipv4Preference(settings.server.host);
+			if (ipv4->restricts(settings.server.host))
+			{
+				try
+				{
+					platform::restrictLookUpsToIpv4(*ipv4);
+				}
+				catch (const std::exception& problem)
+				{
+					// Without the detour, failed connections to the relay server say nothing about IPv4.
+					ipv4->turnOff();
+					problems.push_back(std::format("{}; the relay server's host name is looked up for every address "
+					                               "family, so the server may see an IPv6 address instead of this PC's "
+					                               "IPv4 address",
+					                               problem.what()));
+					log::warning(log::Topic::Hook, "{}", problems.back());
+				}
+			}
+			net::LocalServices* const services = startServices(settings.server, *ipv4);
 			platform::installHostRedirect(settings.hosts, settings.blockUnknownHosts,
 			                              [services, forwards = settings.forwards](const std::string_view host,
 			                                                                       const net::Service& service)

@@ -6,11 +6,10 @@
 #include <string_view>
 #include <utility>
 
-#include <boost/algorithm/string/case_conv.hpp>
-
 #include "logging/log.hpp"
 #include "net/direct_route.hpp"
 #include "net/service.hpp"
+#include "util/text.hpp"
 
 namespace openfeslhook::config
 {
@@ -52,14 +51,14 @@ namespace openfeslhook::config
 		/// @param value The value.
 		void add(const std::string_view pattern, Value value)
 		{
-			entries_.insert_or_assign(normal(pattern), std::move(value));
+			entries_.insert_or_assign(util::normalHostName(pattern), std::move(value));
 		}
 
 		/// Finds the value of a host.
 		/// @param host The host name the game looked up.
 		[[nodiscard]] std::optional<Value> find(const std::string_view host) const
 		{
-			const std::string name = normal(host);
+			const std::string name = util::normalHostName(host);
 			if (const auto exact = entries_.find(name); exact != entries_.end())
 				return exact->second;
 
@@ -80,12 +79,5 @@ namespace openfeslhook::config
 
 	private:
 		std::map<std::string, Value> entries_;
-
-		static std::string normal(std::string_view name)
-		{
-			if (name.ends_with('.'))
-				name.remove_suffix(1);
-			return boost::algorithm::to_lower_copy(std::string(name));
-		}
 	};
 }

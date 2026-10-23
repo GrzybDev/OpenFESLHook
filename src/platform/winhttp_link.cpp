@@ -27,6 +27,7 @@ namespace openfeslhook::platform
 	{
 		HINTERNET session;
 		relay::ServerAddress address;
+		relay::Ipv4Preference& ipv4;
 		Events events;
 		std::mutex mutex;
 		InternetHandle connection;
@@ -42,11 +43,16 @@ namespace openfeslhook::platform
 		bool ended = false;
 		bool sending = false;
 		bool shutDown = false;
+		// Whether the look-ups for the request being sent asked for IPv4 addresses only.
+		bool overIpv4 = false;
+		// Why sending over IPv4 failed, while the request is sent again over every address family.
+		std::optional<std::string> ipv4Failure;
 		std::deque<std::vector<std::uint8_t>> outgoing;
 		std::vector<std::uint8_t> incoming;
 		std::array<std::uint8_t, 16 * 1024> buffer{};
 
-		State(HINTERNET session, relay::ServerAddress address) : session(session), address(std::move(address))
+		State(HINTERNET session, relay::ServerAddress address, relay::Ipv4Preference& ipv4)
+			: session(session), address(std::move(address)), ipv4(ipv4)
 		{
 		}
 
@@ -79,19 +85,68 @@ namespace openfeslhook::platform
 			}
 			watch(opened, &State::request);
 
-			// A quiet session is normal, so receiving waits as long as it takes; WinHTTP's pings keep it alive.
+			// A quiet session is normal, so receiving waits as long as it takes; WinHTTP's keep-alive frames keep it
+			// open.
 			DWORD forever = 0;
 			WinHttpSetOption(opened, WINHTTP_OPTION_RECEIVE_TIMEOUT, &forever, sizeof(forever));
-			const std::wstring headers = std::format(L"Sec-WebSocket-Protocol: {}\r\n", widen(relay::kSubprotocol));
 			HINTERNET const upgrade = enter(&State::request);
-			const bool sent = upgrade && WinHttpSetOption(upgrade, WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET, nullptr, 0) &&
-			                  WinHttpSendRequest(upgrade, headers.c_str(), static_cast<DWORD>(-1),
-			                                     WINHTTP_NO_REQUEST_DATA, 0, 0, reinterpret_cast<DWORD_PTR>(this));
+			const bool upgrading =
+				upgrade && WinHttpSetOption(upgrade, WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET, nullptr, 0);
 			const DWORD error = GetLastError();
 			if (upgrade)
 				leave();
-			if (upgrade && !sent)
-				fail(std::format("the relay server could not be reached: {}", errorText(error)));
+			if (upgrading)
+				sendUpgrade();
+			else if (upgrade)
+				fail(std::format("WinHTTP could not set up the WebSocket upgrade: {}", errorText(error)));
+		}
+
+		// After a failure, WinHTTP sends a request again on the same handle, looking the server up anew.
+		void sendUpgrade()
+		{
+			overIpv4 = ipv4.restricts(address.host);
+			const std::wstring headers = std::format(L"Sec-WebSocket-Protocol: {}\r\n", widen(relay::kSubprotocol));
+			HINTERNET const upgrade = enter(&State::request);
+			if (!upgrade)
+			{
+				endRetry(nullptr);
+				return;
+			}
+
+			const bool sent = WinHttpSendRequest(upgrade, headers.c_str(), static_cast<DWORD>(-1),
+			                                     WINHTTP_NO_REQUEST_DATA, 0, 0, reinterpret_cast<DWORD_PTR>(this));
+			const DWORD error = GetLastError();
+			leave();
+			if (!sent)
+				sendFailed(error, "the relay server could not be reached");
+		}
+
+		// Windows would have tried every address family by itself, so a request that cannot be sent over IPv4 goes
+		// again at once over every family; closing the link cancels sending, which is no failure.
+		void sendFailed(const DWORD error, const std::string_view what)
+		{
+			const bool cancelled = error == ERROR_WINHTTP_OPERATION_CANCELLED;
+			if (overIpv4 && !cancelled)
+			{
+				ipv4Failure = errorText(error);
+				ipv4.suspend();
+				log::debug(log::Topic::Relay,
+				           "Connecting to the relay server again over every address family, since connecting over "
+				           "IPv4 failed: {}",
+				           *ipv4Failure);
+				sendUpgrade();
+				return;
+			}
+
+			endRetry(nullptr);
+			if (!cancelled)
+				fail(std::format("{}: {}", what, errorText(error)));
+		}
+
+		void endRetry(HINTERNET const sent)
+		{
+			if (const std::optional<std::string> reason = std::exchange(ipv4Failure, std::nullopt))
+				endIpv4Retry(ipv4, sent, *reason);
 		}
 
 		void dispatch(HINTERNET handle, const DWORD status, void* information, std::shared_ptr<State>& released)
@@ -99,8 +154,13 @@ namespace openfeslhook::platform
 			switch (status)
 			{
 			case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE:
-				if (HINTERNET const upgrade = enter(&State::request))
 				{
+					// A link that is closing ends a retry as one that did not get through.
+					HINTERNET const upgrade = enter(&State::request);
+					endRetry(upgrade);
+					if (!upgrade)
+						break;
+
 					const bool receiving = WinHttpReceiveResponse(upgrade, nullptr);
 					const DWORD error = GetLastError();
 					leave();
@@ -127,9 +187,11 @@ namespace openfeslhook::platform
 				closeHandles();
 				break;
 			case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
-				if (const DWORD error = static_cast<WINHTTP_ASYNC_RESULT*>(information)->dwError;
-				    error != ERROR_WINHTTP_OPERATION_CANCELLED)
-					fail(std::format("the connection failed: {}", errorText(error)));
+				if (const auto& result = *static_cast<WINHTTP_ASYNC_RESULT*>(information);
+				    result.dwResult == API_SEND_REQUEST)
+					sendFailed(result.dwError, "the connection failed");
+				else if (result.dwError != ERROR_WINHTTP_OPERATION_CANCELLED)
+					fail(std::format("the connection failed: {}", errorText(result.dwError)));
 				break;
 			case WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING:
 				{
@@ -410,8 +472,8 @@ namespace openfeslhook::platform
 		}
 	};
 
-	WinHttpLink::WinHttpLink(HINTERNET session, relay::ServerAddress address)
-		: state_(std::make_shared<State>(session, std::move(address)))
+	WinHttpLink::WinHttpLink(HINTERNET session, relay::ServerAddress address, relay::Ipv4Preference& ipv4)
+		: state_(std::make_shared<State>(session, std::move(address), ipv4))
 	{
 	}
 

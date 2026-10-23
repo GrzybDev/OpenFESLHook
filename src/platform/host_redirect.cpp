@@ -3,10 +3,9 @@
 
 #include <set>
 
-#include <MinHook.h>
-#include <boost/algorithm/string/case_conv.hpp>
-
 #include "logging/log.hpp"
+#include "platform/detour.hpp"
+#include "util/text.hpp"
 
 namespace openfeslhook::platform
 {
@@ -31,7 +30,7 @@ namespace openfeslhook::platform
 			std::mutex mutex;
 			// The hosts handed out, by the loopback address each one got.
 			std::map<std::uint32_t, Redirected> addresses;
-			// The names looked up so far, in lowercase.
+			// The names looked up so far, as DNS compares them.
 			std::set<std::string> lookedUp;
 		};
 
@@ -42,7 +41,7 @@ namespace openfeslhook::platform
 		log::Level levelOfLookUp(const std::string_view name)
 		{
 			const std::scoped_lock lock(gRedirect->mutex);
-			const bool first = gRedirect->lookedUp.insert(boost::algorithm::to_lower_copy(std::string(name))).second;
+			const bool first = gRedirect->lookedUp.insert(util::normalHostName(name)).second;
 			return first ? log::Level::Info : log::Level::Debug;
 		}
 
@@ -145,12 +144,6 @@ namespace openfeslhook::platform
 			}
 			return gRedirect->originalConnect(socket, name, length);
 		}
-
-		void check(const MH_STATUS status, const std::string_view step)
-		{
-			if (status != MH_OK)
-				throw std::runtime_error(std::format("MinHook could not {}: {}", step, MH_StatusToString(status)));
-		}
 	}
 
 	void installHostRedirect(config::HostMap<net::Protocol> hosts, const bool blockUnknownHosts, Connecting connecting)
@@ -159,16 +152,8 @@ namespace openfeslhook::platform
 		gRedirect = new Redirect{
 			.hosts = std::move(hosts), .blockUnknownHosts = blockUnknownHosts, .connecting = std::move(connecting)};
 
-		if (const MH_STATUS status = MH_Initialize(); status != MH_ERROR_ALREADY_INITIALIZED)
-			check(status, "start");
-
-		void* original = nullptr;
-		check(MH_CreateHookApi(L"ws2_32", "gethostbyname", reinterpret_cast<void*>(&lookUp), &original),
-		      "hook ws2_32!gethostbyname");
-		gRedirect->originalGetHostByName = reinterpret_cast<GetHostByName>(original);
-		check(MH_CreateHookApi(L"ws2_32", "connect", reinterpret_cast<void*>(&connectTo), &original),
-		      "hook ws2_32!connect");
-		gRedirect->originalConnect = reinterpret_cast<Connect>(original);
-		check(MH_EnableHook(MH_ALL_HOOKS), "turn the detours on");
+		// Connections are watched first, so that every address a look-up hands out already leads to a listener.
+		detour(L"ws2_32", "connect", &connectTo, gRedirect->originalConnect);
+		detour(L"ws2_32", "gethostbyname", &lookUp, gRedirect->originalGetHostByName);
 	}
 }

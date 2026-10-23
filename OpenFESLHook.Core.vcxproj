@@ -58,6 +58,7 @@
     <ClInclude Include="src\net\stream_connection.hpp" />
     <ClInclude Include="src\pch.hpp" />
     <ClInclude Include="src\relay\frame.hpp" />
+    <ClInclude Include="src\relay\ipv4_preference.hpp" />
     <ClInclude Include="src\relay\route.hpp" />
     <ClInclude Include="src\relay\server_address.hpp" />
     <ClInclude Include="src\relay\session.hpp" />
@@ -84,6 +85,7 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\relay\frame.cpp" />
+    <ClCompile Include="src\relay\ipv4_preference.cpp" />
     <ClCompile Include="src\relay\route.cpp" />
     <ClCompile Include="src\relay\server_address.cpp" />
     <ClCompile Include="src\relay\session.cpp" />
