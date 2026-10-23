@@ -46,7 +46,9 @@
     <ClCompile Include="game_tls_tests.cpp" />
     <ClCompile Include="local_services_tests.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="masking_tests.cpp" />
     <ClCompile Include="packet_tests.cpp" />
+    <ClCompile Include="server_address_tests.cpp" />
     <ClCompile Include="session_tests.cpp" />
     <ClCompile Include="support.cpp" />
   </ItemGroup>

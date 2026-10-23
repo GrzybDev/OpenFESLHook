@@ -49,9 +49,13 @@
       <SubSystem>Windows</SubSystem>
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>src\exports.def</ModuleDefinitionFile>
+      <AdditionalDependencies>winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\platform\text.hpp" />
+    <ClInclude Include="src\platform\winhttp.hpp" />
+    <ClInclude Include="src\platform\winhttp_link.hpp" />
     <ClInclude Include="src\version.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -59,6 +63,9 @@
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\platform\text.cpp" />
+    <ClCompile Include="src\platform\winhttp.cpp" />
+    <ClCompile Include="src\platform\winhttp_link.cpp" />
     <ClCompile Include="src\winsock_startup.cpp" />
   </ItemGroup>
   <ItemGroup>

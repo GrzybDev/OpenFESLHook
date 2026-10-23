@@ -44,6 +44,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\fesl\packet.hpp" />
+    <ClInclude Include="src\http\masking.hpp" />
     <ClInclude Include="src\logging\log.hpp" />
     <ClInclude Include="src\net\listener.hpp" />
     <ClInclude Include="src\net\local_services.hpp" />
@@ -52,13 +53,16 @@
     <ClInclude Include="src\pch.hpp" />
     <ClInclude Include="src\relay\frame.hpp" />
     <ClInclude Include="src\relay\route.hpp" />
+    <ClInclude Include="src\relay\server_address.hpp" />
     <ClInclude Include="src\relay\session.hpp" />
     <ClInclude Include="src\relay\upstream.hpp" />
     <ClInclude Include="src\tls\game_tls.hpp" />
     <ClInclude Include="src\tls\openssl_error.hpp" />
+    <ClInclude Include="src\util\text.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\fesl\packet.cpp" />
+    <ClCompile Include="src\http\masking.cpp" />
     <ClCompile Include="src\logging\log.cpp" />
     <ClCompile Include="src\net\listener.cpp" />
     <ClCompile Include="src\net\local_services.cpp" />
@@ -69,9 +73,11 @@
     </ClCompile>
     <ClCompile Include="src\relay\frame.cpp" />
     <ClCompile Include="src\relay\route.cpp" />
+    <ClCompile Include="src\relay\server_address.cpp" />
     <ClCompile Include="src\relay\session.cpp" />
     <ClCompile Include="src\tls\game_tls.cpp" />
     <ClCompile Include="src\tls\openssl_error.cpp" />
+    <ClCompile Include="src\util\text.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

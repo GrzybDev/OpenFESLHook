@@ -4,6 +4,7 @@
     "boost-asio",
     "boost-beast",
     "boost-endian",
+    "boost-url",
     "gtest",
     {
       "name": "openssl",
