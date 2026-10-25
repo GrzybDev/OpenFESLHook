@@ -52,6 +52,15 @@ namespace openfeslhook::tls
 			return key;
 		}
 
+		// DirtySDK's old ProtoSSL client reads a distinguished name's components only when they are a PrintableString
+		// (tag 0x13) or a T61String (0x14), not a UTF8String, which newer OpenSSL would otherwise emit for some of
+		// them; so every component is forced to PrintableString. The e-mail address is not a valid PrintableString and
+		// the client never reads it, so it keeps OpenSSL's own choice of type.
+		int nameStringType(const std::string_view field)
+		{
+			return field == "emailAddress" ? MBSTRING_ASC : V_ASN1_PRINTABLESTRING;
+		}
+
 		// The distinguished name of the certificate authority built into the game's ProtoSSL client, reproduced so
 		// that its issuer matches (see issueCertificate).
 		Name otg3IssuerName()
@@ -68,7 +77,7 @@ namespace openfeslhook::tls
 				{"emailAddress", "dirtysock-contact@ea.com"},
 			}};
 			for (const auto& [field, value] : fields)
-				check(X509_NAME_add_entry_by_txt(name.get(), field, MBSTRING_ASC,
+				check(X509_NAME_add_entry_by_txt(name.get(), field, nameStringType(field),
 				                                 reinterpret_cast<const unsigned char*>(value), -1, -1, 0) == 1,
 				      "fill in the issuer name");
 			return name;
@@ -89,7 +98,7 @@ namespace openfeslhook::tls
 				{"emailAddress", "fesl@ea.com"},
 			}};
 			for (const auto& [field, value] : fields)
-				check(X509_NAME_add_entry_by_txt(name.get(), field, MBSTRING_ASC,
+				check(X509_NAME_add_entry_by_txt(name.get(), field, nameStringType(field),
 				                                 reinterpret_cast<const unsigned char*>(value), -1, -1, 0) == 1,
 				      "fill in the subject name");
 			return name;

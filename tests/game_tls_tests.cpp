@@ -89,4 +89,26 @@ namespace openfeslhook::test
 		EXPECT_EQ(X509_get_signature_nid(certificate), NID_rsaEncryption);
 		EXPECT_EQ(EVP_PKEY_get_bits(X509_get0_pubkey(certificate)), 1024);
 	}
+
+	TEST(GameTls, EncodesNameComponentsAsPrintableString)
+	{
+		tls::GameTls tls("bfbc2-pc.fesl.example.test");
+
+		X509* const certificate = SSL_CTX_get0_certificate(tls.context().native_handle());
+		ASSERT_NE(certificate, nullptr);
+
+		// Older ProtoSSL clients (Battlefield Heroes) read a distinguished name's components only when they are a
+		// PrintableString or a T61String, not the UTF8String newer OpenSSL would otherwise emit, so every component of
+		// both names has to be a PrintableString.
+		for (X509_NAME* const name : {X509_get_subject_name(certificate), X509_get_issuer_name(certificate)})
+			for (const int nid : {NID_countryName, NID_stateOrProvinceName, NID_localityName, NID_organizationName,
+			                      NID_organizationalUnitName, NID_commonName})
+			{
+				const int index = X509_NAME_get_index_by_NID(name, nid, -1);
+				if (index < 0)
+					continue;
+				const ASN1_STRING* const value = X509_NAME_ENTRY_get_data(X509_NAME_get_entry(name, index));
+				EXPECT_EQ(ASN1_STRING_type(value), V_ASN1_PRINTABLESTRING) << OBJ_nid2sn(nid);
+			}
+	}
 }
