@@ -6,6 +6,7 @@
 #include "http/masking.hpp"
 #include "logging/log.hpp"
 #include "net/local_services.hpp"
+#include "platform/dedicated_server.hpp"
 #include "platform/host_redirect.hpp"
 #include "platform/ipv4_look_ups.hpp"
 #include "platform/text.hpp"
@@ -114,6 +115,9 @@ namespace openfeslhook::app
 			          "OpenFESLHook {} by Marek Grzyb (@GrzybDev), https://github.com/GrzybDev/OpenFESLHook", kVersion);
 			log::info(log::Topic::Hook, "Running in {}, process {}",
 			          platform::narrow(modulePath(nullptr).filename().wstring()), GetCurrentProcessId());
+			// A dedicated server, if any, was already patched in DllMain; its outcome is logged now that the log is open.
+			for (const std::string& message : platform::dedicatedServerMessages())
+				log::info(log::Topic::Hook, "{}", message);
 			if (outputs.file)
 				log::info(log::Topic::Hook, "The log file is {}", platform::narrow(outputs.file->wstring()));
 			if (std::error_code error; std::filesystem::exists(file, error))

@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
 #include "app/open_fesl_hook.hpp"
+#include "platform/dedicated_server.hpp"
 
 namespace
 {
@@ -17,6 +18,10 @@ BOOL APIENTRY DllMain(const HMODULE module, const DWORD reason, LPVOID /*reserve
 	// Thread notifications stay enabled, since the static CRT needs them.
 	if (reason != DLL_PROCESS_ATTACH)
 		return TRUE;
+
+	// A dedicated server is patched here, synchronously, because it has to happen before the game's entry point runs;
+	// it only reads the command line and rewrites the game's own code, neither of which needs the loader lock.
+	openfeslhook::platform::enableDedicatedServer();
 
 	// DllMain runs under the loader lock, so the hook starts on a thread of its own; the game looks up its servers
 	// only once it is running.
