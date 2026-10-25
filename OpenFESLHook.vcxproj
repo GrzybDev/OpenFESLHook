@@ -66,6 +66,7 @@
     <ClInclude Include="src\platform\winhttp.hpp" />
     <ClInclude Include="src\platform\winhttp_forwarder.hpp" />
     <ClInclude Include="src\platform\winhttp_link.hpp" />
+    <ClInclude Include="src\platform\winhttp_redirect.hpp" />
     <ClInclude Include="src\resource.h" />
     <ClInclude Include="src\version.hpp" />
   </ItemGroup>
@@ -86,6 +87,7 @@
     <ClCompile Include="src\platform\winhttp.cpp" />
     <ClCompile Include="src\platform\winhttp_forwarder.cpp" />
     <ClCompile Include="src\platform\winhttp_link.cpp" />
+    <ClCompile Include="src\platform\winhttp_redirect.cpp" />
     <ClCompile Include="src\winsock_startup.cpp" />
   </ItemGroup>
   <ItemGroup>

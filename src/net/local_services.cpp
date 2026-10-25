@@ -4,8 +4,10 @@
 #include "logging/log.hpp"
 #include "net/datagram_relay.hpp"
 #include "net/http_connection.hpp"
+#include "net/proxy_connection.hpp"
 #include "net/stream_connection.hpp"
 #include "tls/game_tls.hpp"
+#include "tls/proxy_tls.hpp"
 
 namespace openfeslhook::net
 {
@@ -40,6 +42,39 @@ namespace openfeslhook::net
 			return listen(service, host, forward);
 
 		return boost::asio::post(io_, boost::asio::use_future([&] { return listen(service, host, forward); })).get();
+	}
+
+	std::optional<std::uint16_t> LocalServices::startProxy()
+	{
+		if (!io_.get_executor().running_in_this_thread())
+			return boost::asio::post(io_, boost::asio::use_future([this] { return startProxy(); })).get();
+
+		if (proxyPort_)
+			return proxyPort_;
+
+		try
+		{
+			std::shared_ptr<http::Forwarder> forwarder = http_ ? http_(std::nullopt) : nullptr;
+			if (!forwarder)
+				throw std::runtime_error("nothing can forward HTTP requests");
+
+			const auto tls = std::make_shared<boost::asio::ssl::context>(tls::proxyContext());
+			const Service service{Protocol::Http, 0x7f000001, 0};
+			const std::shared_ptr<Listener> listener =
+				Listener::start(io_, service, "the WinHTTP proxy",
+			                    [forwarder = std::move(forwarder), tls](boost::asio::ip::tcp::socket socket)
+			{
+				std::make_shared<ProxyConnection>(std::move(socket), forwarder, tls)->start();
+			});
+			proxyPort_ = listener->port();
+			log::info(log::Topic::Http, "Listening for {}", listener->description());
+			return proxyPort_;
+		}
+		catch (const std::exception& problem)
+		{
+			log::error(log::Topic::Http, "Cannot start the WinHTTP proxy: {}", problem.what());
+			return std::nullopt;
+		}
 	}
 
 	std::optional<std::uint16_t> LocalServices::listen(const Service& service, const std::string_view host,

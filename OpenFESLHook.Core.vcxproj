@@ -54,6 +54,7 @@
     <ClInclude Include="src\net\http_connection.hpp" />
     <ClInclude Include="src\net\listener.hpp" />
     <ClInclude Include="src\net\local_services.hpp" />
+    <ClInclude Include="src\net\proxy_connection.hpp" />
     <ClInclude Include="src\net\service.hpp" />
     <ClInclude Include="src\net\stream_connection.hpp" />
     <ClInclude Include="src\pch.hpp" />
@@ -66,6 +67,7 @@
     <ClInclude Include="src\tls\client_tls.hpp" />
     <ClInclude Include="src\tls\game_tls.hpp" />
     <ClInclude Include="src\tls\openssl_error.hpp" />
+    <ClInclude Include="src\tls\proxy_tls.hpp" />
     <ClInclude Include="src\util\text.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -79,6 +81,7 @@
     <ClCompile Include="src\net\http_connection.cpp" />
     <ClCompile Include="src\net\listener.cpp" />
     <ClCompile Include="src\net\local_services.cpp" />
+    <ClCompile Include="src\net\proxy_connection.cpp" />
     <ClCompile Include="src\net\service.cpp" />
     <ClCompile Include="src\net\stream_connection.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -92,6 +95,7 @@
     <ClCompile Include="src\tls\client_tls.cpp" />
     <ClCompile Include="src\tls\game_tls.cpp" />
     <ClCompile Include="src\tls\openssl_error.cpp" />
+    <ClCompile Include="src\tls\proxy_tls.cpp" />
     <ClCompile Include="src\util\text.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

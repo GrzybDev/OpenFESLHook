@@ -13,6 +13,7 @@
 #include "platform/winhttp.hpp"
 #include "platform/winhttp_forwarder.hpp"
 #include "platform/winhttp_link.hpp"
+#include "platform/winhttp_redirect.hpp"
 #include "relay/ipv4_preference.hpp"
 #include "resource.h"
 #include "version.hpp"
@@ -162,6 +163,25 @@ namespace openfeslhook::app
 			          "Look-ups of {} host name(s) and domain(s) lead to this PC, and those of other hosts {}",
 			          settings.hosts.entries().size(),
 			          settings.blockUnknownHosts ? "fail" : "go to the system's resolver");
+
+			// A game's account or store layer may speak WinHTTP, which resolves hosts itself and so slips past the
+			// look-up detour; a local proxy carries its requests to the hook's HTTP hosts on to the relay server.
+			if (const std::optional<std::uint16_t> proxyPort = services->startProxy())
+			{
+				try
+				{
+					platform::installWinHttpRedirect(settings.hosts, std::format("127.0.0.1:{}", *proxyPort));
+					log::info(log::Topic::Http,
+					          "The game's WinHTTP requests to the hook's HTTP hosts go through 127.0.0.1:{}", *proxyPort);
+				}
+				catch (const std::exception& problem)
+				{
+					problems.push_back(std::format("{}; a game that reaches its account or store over WinHTTP will not "
+					                                "get through",
+					                                problem.what()));
+					log::warning(log::Topic::Hook, "{}", problems.back());
+				}
+			}
 		}
 		catch (const std::exception& problem)
 		{

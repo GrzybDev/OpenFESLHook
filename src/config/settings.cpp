@@ -14,12 +14,14 @@ namespace openfeslhook::config
 	{
 		using Tree = boost::property_tree::iptree;
 
-		// The hosts FESL games share: each game has FESL and Theater names of its own below these domains, and fetches
-		// its files from this HTTP host.
-		const std::array<std::pair<std::string_view, net::Protocol>, 3> kGameHosts{{
+		// The hosts the hook redirects by default, so players need no configuration: the FESL and Theater names each
+		// FESL game has of its own below these domains, the HTTP host they fetch their files from, and the web host a
+		// game's WinHTTP account and store traffic goes to (Battlefield Heroes').
+		const std::array<std::pair<std::string_view, net::Protocol>, 4> kGameHosts{{
 			{"*.fesl.ea.com", net::Protocol::Fesl},
 			{"*.theater.ea.com", net::Protocol::Theater},
 			{"easo.ea.com", net::Protocol::Http},
+			{"*.battlefieldheroes.com", net::Protocol::Http},
 		}};
 
 		std::string_view unquoted(const std::string_view text)

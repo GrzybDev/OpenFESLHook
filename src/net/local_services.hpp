@@ -50,12 +50,18 @@ namespace openfeslhook::net
 		[[nodiscard]] std::optional<std::uint16_t> ensure(const Service& service, std::string_view host,
 		                                                  const std::optional<Target>& forward = std::nullopt);
 
+		/// Starts the single HTTP(S) proxy listener the WinHTTP redirect points the game at, unless it already runs,
+		/// and waits until it does. Its requests go to the relay server, as a plain HTTP listener's without a forward do.
+		/// @return The loopback port the proxy listens on, or nothing when it cannot listen.
+		[[nodiscard]] std::optional<std::uint16_t> startProxy();
+
 	private:
 		boost::asio::io_context io_;
 		boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_;
 		std::shared_ptr<relay::Session> session_;
 		HttpForwarders http_;
 		std::map<Service, std::uint16_t> ports_;
+		std::optional<std::uint16_t> proxyPort_;
 		std::thread thread_;
 
 		std::optional<std::uint16_t> listen(const Service& service, std::string_view host,

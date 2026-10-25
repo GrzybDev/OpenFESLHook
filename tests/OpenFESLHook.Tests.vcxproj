@@ -51,6 +51,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="masking_tests.cpp" />
     <ClCompile Include="packet_tests.cpp" />
+    <ClCompile Include="proxy_tests.cpp" />
     <ClCompile Include="server_address_tests.cpp" />
     <ClCompile Include="service_tests.cpp" />
     <ClCompile Include="session_tests.cpp" />
