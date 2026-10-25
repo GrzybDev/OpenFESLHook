@@ -23,6 +23,7 @@ The hook knows no game in particular: it serves every host below the FESL and Th
 | Game                       | Releases                                                    | Tried |
 |:---------------------------|:------------------------------------------------------------|:-----:|
 | Battlefield: Bad Company 2 | Windows client (Steam, Origin, EA app) and dedicated server | yes   |
+| Battlefield Heroes         | Windows client and dedicated server (game versions up to 1.89)   | yes   |
 
 Other FESL games for Windows that meet both conditions may work as they are, or with their hosts in [Configuration](#hosts).
 
@@ -43,7 +44,8 @@ Features
 - Forwards the game's HTTP requests to the relay server's host, adding the host the game asked for as `X-OpenFESL-Host`
 - Reaches the relay server's host name over IPv4 first, so that the server learns each player's IPv4 address even where the name also has IPv6 addresses; a request that cannot get through over IPv4 is sent again over every address family, and IPv4 is given up once IPv6 got through where IPv4 did not
 - Sends chosen hosts straight to other servers as the game's own packets, over plain TCP or re-encrypted with TLS 1.2 or later
-- Changes none of the game's code, so it works the same with every release of a game
+- Changes none of a client's code, so the client works the same with every release of a game
+- Starts a dedicated server whose own start-up code cannot run without a display (Battlefield Heroes) by patching that code in memory, found by signature so it keeps working across the game's releases, and only when the game is launched as a server
 - Optional log to a console and to a file, from the hook's start and each game connection down to every packet with its fields and every HTTP request with its headers, tagged and coloured by topic, with passwords, login keys and session tickets hidden
 
 Build Requirements
@@ -71,7 +73,7 @@ The hook is `Release\dinput8.dll`.
 Installing
 ----------
 
-1. Copy `dinput8.dll`, either from the latest build in [GitHub Releases](https://github.com/GrzybDev/OpenFESLHook/releases) or from `Release` if you compiled it yourself, next to the game's executable (for Battlefield: Bad Company 2, `BFBC2Game.exe`, or `Frost.Game.Main_Win32_Final.exe` for its dedicated server); the game loads it instead of the system's `dinput8.dll`, to which the hook passes the game's DirectInput calls
+1. Copy `dinput8.dll`, either from the latest build in [GitHub Releases](https://github.com/GrzybDev/OpenFESLHook/releases) or from `Release` if you compiled it yourself, next to the game's executable (for Battlefield: Bad Company 2, `BFBC2Game.exe`, or `Frost.Game.Main_Win32_Final.exe` for its dedicated server; for Battlefield Heroes, `BFHeroes.exe`, which is both the client and, with `+dedicated`, the server); the game loads it instead of the system's `dinput8.dll`, to which the hook passes the game's DirectInput calls
 2. Put `OpenFESLHook.ini`, described in [Configuration](#configuration), next to it if you want to change any default
 
 To uninstall, delete `dinput8.dll` and `OpenFESLHook.ini`.
