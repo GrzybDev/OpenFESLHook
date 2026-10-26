@@ -14,6 +14,7 @@
 #include <windows.h>
 
 #include "platform/image_search.hpp"
+#include "platform/server_manager_points.hpp"
 #include "platform/server_patch_points.hpp"
 
 // These cases run against the real Battlefield Heroes files and are opt-in: set OPENFESLHOOK_TEST_BFHEROES_EXE to a
@@ -111,21 +112,34 @@ namespace openfeslhook::platform
 			return image;
 		}
 
-		std::uintptr_t rva(const Image& image, const std::uint8_t* at)
+		// The file an environment variable names, laid out as loaded: none when the variable is unset, an empty buffer
+		// when the file cannot be read or is not a PE32 image. The buffer is moved, never copied, so the addresses the
+		// layout rebased to it stay true.
+		std::optional<std::vector<std::uint8_t>> loadedFrom(const char* variable)
 		{
-			return static_cast<std::uintptr_t>(at - image.base);
+			const std::optional<std::string> path = fromEnvironment(variable);
+			if (!path)
+				return std::nullopt;
+			return mapAsLoaded(readFile(*path));
+		}
+
+		Image imageOf(const std::vector<std::uint8_t>& mapped)
+		{
+			return moduleImage(reinterpret_cast<HMODULE>(const_cast<std::uint8_t*>(mapped.data())));
+		}
+
+		std::uintptr_t rva(const Image& image, const void* at)
+		{
+			return static_cast<std::uintptr_t>(static_cast<const std::uint8_t*>(at) - image.base);
 		}
 
 		TEST(DedicatedServer, LocatesEveryPatchPointInTheClientExecutable)
 		{
-			const std::optional<std::string> path = fromEnvironment("OPENFESLHOOK_TEST_BFHEROES_EXE");
-			if (!path)
+			const std::optional<std::vector<std::uint8_t>> mapped = loadedFrom("OPENFESLHOOK_TEST_BFHEROES_EXE");
+			if (!mapped)
 				GTEST_SKIP() << "set OPENFESLHOOK_TEST_BFHEROES_EXE to a BFHeroes.exe to run this";
-			const std::vector<std::uint8_t> file = readFile(*path);
-			ASSERT_FALSE(file.empty()) << "could not read " << *path;
-			std::vector<std::uint8_t> mapped = mapAsLoaded(file);
-			ASSERT_FALSE(mapped.empty()) << "not a PE32 image: " << *path;
-			const Image image = moduleImage(reinterpret_cast<HMODULE>(mapped.data()));
+			ASSERT_FALSE(mapped->empty()) << "OPENFESLHOOK_TEST_BFHEROES_EXE names no readable PE32 image";
+			const Image image = imageOf(*mapped);
 			ASSERT_NE(image.text, nullptr);
 
 			const ServerPatchPoints points = locateServerPatchPoints(image);
@@ -150,14 +164,11 @@ namespace openfeslhook::platform
 
 		TEST(DedicatedServer, LocatesEveryPatchPointInTheRendererDll)
 		{
-			const std::optional<std::string> path = fromEnvironment("OPENFESLHOOK_TEST_RENDDX9_DLL");
-			if (!path)
+			const std::optional<std::vector<std::uint8_t>> mapped = loadedFrom("OPENFESLHOOK_TEST_RENDDX9_DLL");
+			if (!mapped)
 				GTEST_SKIP() << "set OPENFESLHOOK_TEST_RENDDX9_DLL to a RendDX9.dll to run this";
-			const std::vector<std::uint8_t> file = readFile(*path);
-			ASSERT_FALSE(file.empty()) << "could not read " << *path;
-			std::vector<std::uint8_t> mapped = mapAsLoaded(file);
-			ASSERT_FALSE(mapped.empty()) << "not a PE32 image: " << *path;
-			const Image image = moduleImage(reinterpret_cast<HMODULE>(mapped.data()));
+			ASSERT_FALSE(mapped->empty()) << "OPENFESLHOOK_TEST_RENDDX9_DLL names no readable PE32 image";
+			const Image image = imageOf(*mapped);
 			ASSERT_NE(image.text, nullptr);
 
 			const RendererPatchPoints points = locateRendererPatchPoints(image);
@@ -165,6 +176,28 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.resolutionFromSettings), 0x34A4Bu);
 			EXPECT_EQ(rva(image, points.windowSizeWrites[0]), 0x3AE74u);
 			EXPECT_EQ(rva(image, points.windowSizeWrites[1]), 0x3AEADu);
+		}
+
+		TEST(DedicatedServer, LocatesTheHostingPointsInTheClientExecutable)
+		{
+			const std::optional<std::vector<std::uint8_t>> mapped = loadedFrom("OPENFESLHOOK_TEST_BFHEROES_EXE");
+			if (!mapped)
+				GTEST_SKIP() << "set OPENFESLHOOK_TEST_BFHEROES_EXE to a BFHeroes.exe to run this";
+			ASSERT_FALSE(mapped->empty()) << "OPENFESLHOOK_TEST_BFHEROES_EXE names no readable PE32 image";
+			const Image image = imageOf(*mapped);
+			ASSERT_NE(image.text, nullptr);
+
+			const ServerManagerPoints points = locateServerManagerPoints(image);
+			ASSERT_TRUE(points.complete());
+			EXPECT_EQ(rva(image, points.backendTable), 0x997E7Cu);
+			EXPECT_EQ(rva(image, points.backendSettingsTable), 0xA2683Cu);
+			EXPECT_EQ(rva(image, points.serverGameSettingsTable), 0x9A4750u);
+			EXPECT_EQ(rva(image, points.hub), 0xE4A678u);
+			EXPECT_EQ(rva(image, points.serverSettings), 0xDC005Cu);
+			EXPECT_EQ(rva(image, points.gameManagerListen), 0xAD11C8u);
+			EXPECT_EQ(rva(image, *points.gameManagerListen), 0x516068u);
+			// The update the server manager ticks from, reached through the rebased table.
+			EXPECT_EQ(rva(image, points.backendTable[kBackendUpdateSlot]), 0xB84B9u);
 		}
 	}
 }

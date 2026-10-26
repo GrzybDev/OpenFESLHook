@@ -14,6 +14,7 @@
 #include "logging/log.hpp"
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
+#include "platform/server_manager.hpp"
 #include "platform/server_patch_points.hpp"
 
 namespace openfeslhook::platform
@@ -202,6 +203,7 @@ namespace openfeslhook::platform
 			// The renderer DLL is not loaded yet; a detour of the loader patches it the moment the game loads it.
 			detour<LoadLibraryAType>(L"kernel32", "LoadLibraryA", &loadLibraryADetour, originalLoadLibraryA);
 			hideWindows();
+			messages.push_back(startServerManager(image));
 
 			const auto base = reinterpret_cast<std::uintptr_t>(image.base);
 			messages.push_back(std::format(
