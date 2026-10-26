@@ -78,6 +78,27 @@ namespace openfeslhook::platform
 	/// @param target The function the call reaches.
 	[[nodiscard]] const std::uint8_t* findCallTo(const Image& image, const std::uint8_t* target) noexcept;
 
+	/// The function a relative `call` or `jmp` at an address reaches, or nullptr when it lands outside the code.
+	/// @param image The image.
+	/// @param call The instruction, which must lie in the code.
+	[[nodiscard]] const std::uint8_t* callTarget(const Image& image, const std::uint8_t* call) noexcept;
+
+	/// The function reached by the relative call that the first match of a signature in a range holds at an offset,
+	/// or nullptr when the signature does not match or the call lands outside the code.
+	/// @param image The image.
+	/// @param start The range's first byte.
+	/// @param size The range's length.
+	/// @param signature The signature, as findSignature reads it.
+	/// @param offset Where, in the match, the call instruction begins.
+	[[nodiscard]] const std::uint8_t* calledAt(const Image& image, const std::uint8_t* start, std::size_t size,
+	                                           std::string_view signature, std::size_t offset) noexcept;
+
+	/// The global whose absolute address an instruction's operand holds, or nullptr when the address lies outside the
+	/// image.
+	/// @param image The image.
+	/// @param operand The operand's four bytes.
+	[[nodiscard]] void* const* globalAt(const Image& image, const std::uint8_t* operand) noexcept;
+
 	/// Walks back from an address inside a function to its first byte, or nullptr when none is found within range.
 	/// Recognises the standard `push ebp; mov/add/sub ebp` frame prologue and the set-up that a function with an
 	/// exception frame begins with: its frame size (`push imm8` or `push imm32`), then its scope table or handler (`push

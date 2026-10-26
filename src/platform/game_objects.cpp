@@ -101,4 +101,9 @@ namespace openfeslhook::platform
 	{
 		return made_ ? storage_ : nullptr;
 	}
+
+	void* GameString::get() noexcept
+	{
+		return made_ ? storage_ : nullptr;
+	}
 }

@@ -106,6 +106,31 @@ namespace openfeslhook::platform
 			EXPECT_TRUE(findPushesOf(whole, nullptr).empty());
 		}
 
+		TEST(ImageSearch, FollowsACallAndReadsTheGlobalAnOperandNames)
+		{
+			std::vector<std::uint8_t> image(0x40, 0x90);
+			const Image whole{.base = image.data(), .size = image.size(), .text = image.data(),
+			                  .textSize = 0x30};
+			// call -0x10 at 0x20 lands at 0x15; call +0x40 at 0x08 lands past the code.
+			image[0x20] = 0xE8;
+			const std::int32_t back = -0x10;
+			std::memcpy(image.data() + 0x21, &back, 4);
+			image[0x08] = 0xE8;
+			const std::int32_t past = 0x40;
+			std::memcpy(image.data() + 0x09, &past, 4);
+			EXPECT_EQ(callTarget(whole, image.data() + 0x20), image.data() + 0x15);
+			EXPECT_EQ(callTarget(whole, image.data() + 0x08), nullptr);
+			EXPECT_EQ(calledAt(whole, image.data(), 0x30, "90 E8 F0 FF FF FF", 1), image.data() + 0x15);
+
+			const auto inside = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(image.data() + 0x38));
+			const auto outside = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(image.data() + 0x3E));
+			std::uint8_t operand[4]{};
+			std::memcpy(operand, &inside, 4);
+			EXPECT_EQ(reinterpret_cast<const std::uint8_t*>(globalAt(whole, operand)), image.data() + 0x38);
+			std::memcpy(operand, &outside, 4);
+			EXPECT_EQ(globalAt(whole, operand), nullptr);
+		}
+
 		TEST(ImageSearch, FindsAClassTableThroughItsRunTimeType)
 		{
 			std::array<std::uint8_t, 0x200> image{};

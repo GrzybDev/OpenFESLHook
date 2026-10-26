@@ -183,6 +183,35 @@ namespace openfeslhook::platform
 		return nullptr;
 	}
 
+	const std::uint8_t* callTarget(const Image& image, const std::uint8_t* call) noexcept
+	{
+		if (call == nullptr || call < image.text || call + 5 > image.text + image.textSize)
+			return nullptr;
+		std::int32_t relative = 0;
+		std::memcpy(&relative, call + 1, 4);
+		const std::uint8_t* const target = call + 5 + relative;
+		return target >= image.text && target < image.text + image.textSize ? target : nullptr;
+	}
+
+	const std::uint8_t* calledAt(const Image& image, const std::uint8_t* start, const std::size_t size,
+	                             const std::string_view signature, const std::size_t offset) noexcept
+	{
+		const std::uint8_t* const match = findSignature(start, size, signature);
+		return match != nullptr ? callTarget(image, match + offset) : nullptr;
+	}
+
+	void* const* globalAt(const Image& image, const std::uint8_t* operand) noexcept
+	{
+		if (operand == nullptr)
+			return nullptr;
+		std::uint32_t address = 0;
+		std::memcpy(&address, operand, 4);
+		const auto* const global = reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(address));
+		if (global < image.base || global + sizeof(void*) > image.base + image.size)
+			return nullptr;
+		return reinterpret_cast<void* const*>(global);
+	}
+
 	const std::uint8_t* functionStart(const std::uint8_t* lowerBound, const std::uint8_t* within) noexcept
 	{
 		if (within == nullptr || lowerBound == nullptr)

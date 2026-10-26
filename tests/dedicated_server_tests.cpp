@@ -15,6 +15,7 @@
 
 #include "platform/image_search.hpp"
 #include "platform/net_server_points.hpp"
+#include "platform/player_entry_points.hpp"
 #include "platform/server_manager_points.hpp"
 #include "platform/server_patch_points.hpp"
 
@@ -228,6 +229,45 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.addFilterAgent), 0x4502F9u);
 			EXPECT_EQ(rva(image, points.startThread), 0x44DC02u);
 			EXPECT_EQ(rva(image, points.pushBack), 0x0AF8E3u);
+		}
+
+		TEST(DedicatedServer, LocatesThePlayerEntryPartsInTheClientExecutable)
+		{
+			const std::optional<std::vector<std::uint8_t>> mapped = loadedFrom("OPENFESLHOOK_TEST_BFHEROES_EXE");
+			if (!mapped)
+				GTEST_SKIP() << "set OPENFESLHOOK_TEST_BFHEROES_EXE to a BFHeroes.exe to run this";
+			ASSERT_FALSE(mapped->empty()) << "OPENFESLHOOK_TEST_BFHEROES_EXE names no readable PE32 image";
+			const Image image = imageOf(*mapped);
+			ASSERT_NE(image.text, nullptr);
+
+			const PlayerEntryPoints points = locatePlayerEntryPoints(image);
+			ASSERT_TRUE(points.complete());
+			EXPECT_EQ(rva(image, points.listenerTable), 0x9AC29Cu);
+			EXPECT_EQ(rva(image, points.constructInfo), 0x2B75ABu);
+			EXPECT_EQ(rva(image, points.readInfo), 0x2B0A57u);
+			EXPECT_EQ(rva(image, points.destroyInfo), 0x0EF41Fu);
+			EXPECT_EQ(rva(image, points.buildScriptArguments), 0x0EE616u);
+			EXPECT_EQ(rva(image, points.scriptEvents), 0x092127u);
+			EXPECT_EQ(rva(image, points.fireScriptEvent), 0x093068u);
+			EXPECT_EQ(rva(image, points.releaseScriptArguments), 0x083C02u);
+			EXPECT_EQ(points.prePlayerConnect, 0x39);
+			EXPECT_EQ(rva(image, points.createPlayer), 0x0E69A4u);
+			EXPECT_EQ(rva(image, points.playerManager), 0xE4AA4Cu);
+			EXPECT_EQ(rva(image, points.settings), 0xE2CA2Cu);
+			EXPECT_EQ(rva(image, points.registry), 0xE2CA30u);
+			EXPECT_EQ(rva(image, points.eventManager), 0xE2CA34u);
+			EXPECT_EQ(rva(image, points.allocate), 0x0038D2u);
+			EXPECT_EQ(rva(image, points.constructCreatePlayerEvent), 0x19B82Au);
+			EXPECT_EQ(points.createPlayerEventSize, 0x50u);
+			EXPECT_EQ(rva(image, points.addToScoring), 0x2B6160u);
+			EXPECT_EQ(rva(image, points.processDisconnections), 0x0E9999u);
+			EXPECT_EQ(rva(image, points.sendServerInfo), 0x0E9274u);
+			EXPECT_EQ(rva(image, points.finishEntry), 0x0E5893u);
+			EXPECT_EQ(rva(image, points.formatTime), 0x050B66u);
+			EXPECT_EQ(rva(image, points.serverSettings), 0xDC005Cu);
+			EXPECT_EQ(rva(image, points.reservedSlots), 0xDC14A4u);
+			EXPECT_EQ(rva(image, points.countReservedPlayers), 0x08E0E7u);
+			EXPECT_EQ(rva(image, points.isReserved), 0x08E043u);
 		}
 	}
 }

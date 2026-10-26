@@ -63,6 +63,11 @@ namespace openfeslhook::platform
 	/// The game manager listener's virtual-function slot that receives what a player's game sent.
 	inline constexpr std::size_t kPlasmaReceiveSlot = 0x28 / sizeof(void*);
 
+	/// Finds the game server's handling of its network, which nothing in the client build calls: it reads whether the
+	/// net graph is shown right after checking that the game server has a network server. Null when it is not found.
+	/// @param image The game executable as it is mapped.
+	[[nodiscard]] const void* findHandleNetwork(const Image& image);
+
 	/// Finds the network server's points in the game executable.
 	/// @param image The game executable as it is mapped.
 	[[nodiscard]] NetServerPoints locateNetServerPoints(const Image& image);

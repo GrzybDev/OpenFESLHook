@@ -77,6 +77,9 @@ namespace openfeslhook::platform
 		/// The string, or nullptr when msvcp90 was not there to make it.
 		[[nodiscard]] const void* get() const noexcept;
 
+		/// The string, for a game function that writes to it, or nullptr when msvcp90 was not there to make it.
+		[[nodiscard]] void* get() noexcept;
+
 	private:
 		alignas(4) std::uint8_t storage_[kGameStringSize]{};
 		bool made_ = false;

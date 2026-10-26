@@ -15,6 +15,7 @@
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
 #include "platform/net_server.hpp"
+#include "platform/player_entry.hpp"
 #include "platform/server_manager.hpp"
 #include "platform/server_patch_points.hpp"
 
@@ -228,6 +229,7 @@ namespace openfeslhook::platform
 			allowSeveralServers();
 			messages.push_back(startServerManager(image));
 			messages.push_back(startNetServer(image));
+			messages.push_back(startPlayerEntry(image));
 
 			const auto base = reinterpret_cast<std::uintptr_t>(image.base);
 			messages.push_back(std::format(

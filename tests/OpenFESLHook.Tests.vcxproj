@@ -49,7 +49,9 @@
     <ClCompile Include="http_tests.cpp" />
     <ClCompile Include="image_search_tests.cpp" />
     <ClCompile Include="..\src\platform\image_search.cpp" />
+    <ClCompile Include="..\src\platform\engine_search.cpp" />
     <ClCompile Include="..\src\platform\net_server_points.cpp" />
+    <ClCompile Include="..\src\platform\player_entry_points.cpp" />
     <ClCompile Include="..\src\platform\server_manager_points.cpp" />
     <ClCompile Include="..\src\platform\server_patch_points.cpp" />
     <ClCompile Include="ipv4_preference_tests.cpp" />
