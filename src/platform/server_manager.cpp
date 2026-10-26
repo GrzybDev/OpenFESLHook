@@ -22,7 +22,6 @@ namespace openfeslhook::platform
 		constexpr std::uint32_t kPersonaLoggedIn = 0x40;
 		constexpr std::uint32_t kFeslAndTheaterConnected = 0x14;
 		constexpr std::size_t kCreateGameParams = 0x20; // in the server game settings
-		constexpr std::size_t kDataCenter = 0x3AC;      // std::string, in the server game settings
 		constexpr std::size_t kServerName = 0x1C;       // std::string, in the server settings
 		constexpr std::size_t kServerIp = 0x12C;        // std::string
 		constexpr std::size_t kServerPort = 0x148;
@@ -107,7 +106,7 @@ namespace openfeslhook::platform
 			const auto maxPlayers = read<std::int32_t>(serverSettings + kMaxPlayers);
 			// The server build names its game this way; the game's server browser shows it.
 			const std::string name =
-				std::format("[{}]{}({}:{})", readGameString(serverGameSettings + kDataCenter),
+				std::format("[{}]{}({}:{})", readGameString(serverGameSettings + points.dataCenterField),
 				            readGameString(serverSettings + kServerName), ip.empty() ? "(unknown)" : ip, port);
 
 			std::uint8_t* const params = serverGameSettings + kCreateGameParams;
@@ -182,24 +181,26 @@ namespace openfeslhook::platform
 		}
 	}
 
-	std::string startServerManager(const Image& image) noexcept
+	std::string startServerManager(const ServerManagerPoints& found) noexcept
 	{
 		try
 		{
-			points = locateServerManagerPoints(image);
+			points = found;
 			if (!points.complete())
 				return std::format(
 					"The dedicated server's game will not be listed in Theater: the hosting points were not all found "
-					"in this build (backend {}, backend settings {}, server game settings {}, hub {}, server settings "
-					"{}, game manager listen {}).",
+					"in this build (backend {}, backend update {}, backend settings {}, server game settings {}, data "
+					"center {}, hub {}, server settings {}, game manager listen {}).",
 					points.backendTable != nullptr ? "found" : "missing",
+					points.updateSlot != 0 ? "found" : "missing",
 					points.backendSettingsTable != nullptr ? "found" : "missing",
 					points.serverGameSettingsTable != nullptr ? "found" : "missing",
+					points.dataCenterField != 0 ? "found" : "missing",
 					points.hub != nullptr ? "found" : "missing",
 					points.serverSettings != nullptr ? "found" : "missing",
 					points.gameManagerListen != nullptr ? "found" : "missing");
 			void* original = nullptr;
-			if (!replaceEntry(points.backendTable + kBackendUpdateSlot, reinterpret_cast<void*>(&updateDetour),
+			if (!replaceEntry(points.backendTable + points.updateSlot, reinterpret_cast<void*>(&updateDetour),
 			                  original))
 				return "The dedicated server's game will not be listed in Theater: the backend's update could not be "
 				       "followed.";

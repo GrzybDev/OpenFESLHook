@@ -9,6 +9,7 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <windows.h>
@@ -194,12 +195,14 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.backendTable), 0x997E7Cu);
 			EXPECT_EQ(rva(image, points.backendSettingsTable), 0xA2683Cu);
 			EXPECT_EQ(rva(image, points.serverGameSettingsTable), 0x9A4750u);
+			EXPECT_EQ(points.dataCenterField, 0x3ACu);
 			EXPECT_EQ(rva(image, points.hub), 0xE4A678u);
 			EXPECT_EQ(rva(image, points.serverSettings), 0xDC005Cu);
 			EXPECT_EQ(rva(image, points.gameManagerListen), 0xAD11C8u);
 			EXPECT_EQ(rva(image, *points.gameManagerListen), 0x516068u);
 			// The update the server manager ticks from, reached through the rebased table.
-			EXPECT_EQ(rva(image, points.backendTable[kBackendUpdateSlot]), 0xB84B9u);
+			EXPECT_EQ(points.updateSlot, 0x44 / sizeof(void*));
+			EXPECT_EQ(rva(image, points.backendTable[points.updateSlot]), 0xB84B9u);
 		}
 
 		TEST(DedicatedServer, LocatesTheGameServerNetworkingInTheClientExecutable)
@@ -216,6 +219,7 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.gameServerTable), 0x9AC2A4u);
 			EXPECT_EQ(rva(image, points.gameServerTable[kGameServerUpdateSlot]), 0x0ED57Du);
 			EXPECT_EQ(rva(image, points.handleNetwork), 0x0E9FBCu);
+			EXPECT_EQ(points.netServerField, 0xDCu);
 			EXPECT_EQ(rva(image, points.plasmaListenerTable), 0xA13DCCu);
 			EXPECT_EQ(rva(image, points.plasmaListenerTable[kPlasmaReceiveSlot]), 0x2817BDu);
 			EXPECT_EQ(rva(image, points.netServerTable), 0xAA95ACu);
@@ -250,7 +254,9 @@ namespace openfeslhook::platform
 			ASSERT_NE(image.text, nullptr);
 
 			const PlayerEntryPoints points = locatePlayerEntryPoints(image);
-			ASSERT_TRUE(points.complete());
+			ASSERT_EQ(points.missing(), std::vector<std::string_view>{});
+			EXPECT_EQ(points.partOffset, 0xB0u);
+			EXPECT_EQ(points.listenerOffset, 0xB4u);
 			EXPECT_EQ(rva(image, points.listenerTable), 0x9AC29Cu);
 			EXPECT_EQ(rva(image, points.constructInfo), 0x2B75ABu);
 			EXPECT_EQ(rva(image, points.readInfo), 0x2B0A57u);
@@ -277,6 +283,10 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.reservedSlots), 0xDC14A4u);
 			EXPECT_EQ(rva(image, points.countReservedPlayers), 0x08E0E7u);
 			EXPECT_EQ(rva(image, points.isReserved), 0x08E043u);
+			EXPECT_EQ(points.setInfoSlot, 0x560 / sizeof(void*));
+			EXPECT_EQ(points.setServerTextSlot, 0x350 / sizeof(void*));
+			EXPECT_EQ(points.setJoinTimeSlot, 0x3C0 / sizeof(void*));
+			EXPECT_EQ(points.backendTimeSlot, 0xB0 / sizeof(void*));
 		}
 	}
 }

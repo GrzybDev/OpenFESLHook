@@ -227,9 +227,14 @@ namespace openfeslhook::platform
 			detour<LoadLibraryAType>(L"kernel32", "LoadLibraryA", &loadLibraryADetour, originalLoadLibraryA);
 			hideWindows();
 			allowSeveralServers();
-			messages.push_back(startServerManager(image));
-			messages.push_back(startNetServer(image));
-			messages.push_back(startPlayerEntry(image));
+			// Every module's points are found before any module replaces a table entry: some look into the same
+			// tables, and a replaced entry no longer leads into the game's code.
+			const ServerManagerPoints hosting = locateServerManagerPoints(image);
+			const NetServerPoints network = locateNetServerPoints(image);
+			const PlayerEntryPoints entry = locatePlayerEntryPoints(image);
+			messages.push_back(startServerManager(hosting));
+			messages.push_back(startNetServer(network));
+			messages.push_back(startPlayerEntry(entry));
 
 			const auto base = reinterpret_cast<std::uintptr_t>(image.base);
 			messages.push_back(std::format(

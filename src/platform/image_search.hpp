@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -117,4 +118,18 @@ namespace openfeslhook::platform
 	/// @param offset Where, in the object, the part whose table is wanted begins; 0 for the primary table.
 	[[nodiscard]] const void* const* findVtable(const Image& image, std::string_view decoratedName,
 	                                            std::uint32_t offset = 0);
+
+	/// Where, in an object of a class, each part with a table of virtual functions begins, in ascending order: 0 for
+	/// the primary table, then one offset per further base part. Empty when the image has no such class.
+	/// @param image The image.
+	/// @param decoratedName The class's decorated type name.
+	[[nodiscard]] std::vector<std::uint32_t> vtableOffsets(const Image& image, std::string_view decoratedName);
+
+	/// The slot of a table of virtual functions whose function begins with a signature, or nothing when no slot or
+	/// more than one does. The table ends at the first entry that does not point into the code.
+	/// @param image The image.
+	/// @param table The table.
+	/// @param signature The signature, as findSignature reads it.
+	[[nodiscard]] std::optional<std::size_t> findSlot(const Image& image, const void* const* table,
+	                                                  std::string_view signature);
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "platform/image_search.hpp"
 
 namespace openfeslhook::platform
@@ -18,6 +20,9 @@ namespace openfeslhook::platform
 
 		/// The game server's handling of its network: new connections, lost ones and the players' packets.
 		const void* handleNetwork = nullptr;
+
+		/// Where the game server holds its network server, which handleNetwork checks first; 0 when not found.
+		std::uint32_t netServerField = 0;
 
 		/// The virtual-function table of the Plasma socket manager's part that the game manager reports to, which hands
 		/// what the players' games send to the network server.

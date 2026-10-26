@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 #include "platform/image_search.hpp"
 
 namespace openfeslhook::platform
@@ -13,11 +16,18 @@ namespace openfeslhook::platform
 		/// The virtual-function table of the game's EA backend, whose update the server manager ticks from.
 		const void* const* backendTable = nullptr;
 
+		/// The backend's virtual-function slot of its per-frame update; 0 when not found.
+		std::size_t updateSlot = 0;
+
 		/// The table of the backend's settings, among whose objects the server game settings are.
 		const void* const* backendSettingsTable = nullptr;
 
 		/// The table of the server game settings, which hold the game's create-game parameters.
 		const void* const* serverGameSettingsTable = nullptr;
+
+		/// Where the server game settings hold the data center's name (std::string), which differs between builds; 0
+		/// when not found.
+		std::uint32_t dataCenterField = 0;
 
 		/// The global that holds DirtySDK's hub, through which the GameManager is reached.
 		void* const* hub = nullptr;
@@ -32,9 +42,6 @@ namespace openfeslhook::platform
 		/// Whether every point was found.
 		[[nodiscard]] bool complete() const noexcept;
 	};
-
-	/// The backend's virtual-function slot of its per-frame update.
-	inline constexpr std::size_t kBackendUpdateSlot = 0x44 / sizeof(void*);
 
 	/// Finds the server manager's points in the game executable.
 	/// @param image The game executable as it is mapped.

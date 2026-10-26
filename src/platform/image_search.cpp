@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "platform/image_search.hpp"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cstring>
@@ -50,6 +51,31 @@ namespace openfeslhook::platform
 			std::uint32_t value = 0;
 			std::memcpy(&value, at, sizeof value);
 			return value;
+		}
+
+		// Calls visit(offset, table) for each table of virtual functions of a class, found through its complete object
+		// locators: a zero signature, the table's offset within the object, the constructor displacement's offset,
+		// then the type descriptor, which holds a vtable pointer and a spare pointer before the decorated name. The
+		// word before a table points to its locator. Stops when visit returns true.
+		template <typename Visit>
+		void forEachVtable(const Image& image, const std::string_view decoratedName, Visit visit)
+		{
+			const std::uint8_t* const name = findString(image, decoratedName);
+			if (name == nullptr || name - image.base < 8)
+				return;
+			const auto descriptor = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(name - 8));
+			for (const std::uint8_t* reference : findAllBytes(image.base, image.size, &descriptor, sizeof descriptor))
+			{
+				if (reference - image.base < 12)
+					continue;
+				const std::uint8_t* const locator = reference - 12;
+				if (readDword(locator) != 0)
+					continue;
+				const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(locator));
+				if (const std::uint8_t* const slot = findBytes(image.base, image.size, &address, sizeof address))
+					if (visit(readDword(locator + 4), reinterpret_cast<const void* const*>(slot + 4)))
+						return;
+			}
 		}
 
 		std::array<std::uint8_t, 5> pushOf(const std::uint8_t* target) noexcept
@@ -234,24 +260,42 @@ namespace openfeslhook::platform
 
 	const void* const* findVtable(const Image& image, const std::string_view decoratedName, const std::uint32_t offset)
 	{
-		// A type descriptor holds a vtable pointer and a spare pointer, then the decorated name.
-		const std::uint8_t* const name = findString(image, decoratedName);
-		if (name == nullptr || name - image.base < 8)
-			return nullptr;
-		const auto descriptor = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(name - 8));
-		for (const std::uint8_t* reference : findAllBytes(image.base, image.size, &descriptor, sizeof descriptor))
+		const void* const* found = nullptr;
+		forEachVtable(image, decoratedName, [&](const std::uint32_t at, const void* const* table) {
+			if (at == offset)
+				found = table;
+			return found != nullptr;
+		});
+		return found;
+	}
+
+	std::vector<std::uint32_t> vtableOffsets(const Image& image, const std::string_view decoratedName)
+	{
+		std::vector<std::uint32_t> offsets;
+		forEachVtable(image, decoratedName, [&](const std::uint32_t at, const void* const*) {
+			if (std::ranges::find(offsets, at) == offsets.end())
+				offsets.push_back(at);
+			return false;
+		});
+		std::ranges::sort(offsets);
+		return offsets;
+	}
+
+	std::optional<std::size_t> findSlot(const Image& image, const void* const* table, const std::string_view signature)
+	{
+		std::optional<std::size_t> found;
+		for (std::size_t slot = 0; table != nullptr; ++slot)
 		{
-			// A complete object locator: a zero signature, the table's offset within the object, the constructor
-			// displacement's offset, then the type descriptor. The word before a class's table points to its locator.
-			if (reference - image.base < 12)
+			const auto* const function = static_cast<const std::uint8_t*>(table[slot]);
+			if (function < image.text || function >= image.text + image.textSize)
+				break;
+			const std::size_t room = static_cast<std::size_t>(image.text + image.textSize - function);
+			if (findSignature(function, std::min(room, kMaxSignature), signature) != function)
 				continue;
-			const std::uint8_t* const locator = reference - 12;
-			if (readDword(locator) != 0 || readDword(locator + 4) != offset)
-				continue; // not a locator, or the table of another part of the object
-			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(locator));
-			if (const std::uint8_t* const slot = findBytes(image.base, image.size, &address, sizeof address))
-				return reinterpret_cast<const void* const*>(slot + 4);
+			if (found)
+				return std::nullopt;
+			found = slot;
 		}
-		return nullptr;
+		return found;
 	}
 }

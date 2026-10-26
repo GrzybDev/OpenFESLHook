@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <vector>
 
 #include "platform/image_search.hpp"
@@ -170,6 +171,35 @@ namespace openfeslhook::platform
 			const void* const* const baseTable = findVtable(whole, name, baseOffset);
 			ASSERT_NE(baseTable, nullptr);
 			EXPECT_EQ(reinterpret_cast<std::uintptr_t>(baseTable[0]), baseFirst);
+			EXPECT_EQ(vtableOffsets(whole, name), (std::vector<std::uint32_t>{0, baseOffset}));
+		}
+
+		TEST(ImageSearch, FindsTheOneSlotWhoseFunctionHasABody)
+		{
+			std::vector<std::uint8_t> image(0x60, 0xCC);
+			const Image whole{.base = image.data(), .size = image.size(), .text = image.data(), .textSize = 0x30};
+			const std::uint8_t getter[] = {0x8B, 0x81, 0xA4, 0x00, 0x00, 0x00, 0xC3};
+			const std::uint8_t other[] = {0x56, 0x8B, 0xF1, 0xC3};
+			std::memcpy(image.data(), other, sizeof(other));
+			std::memcpy(image.data() + 0x10, getter, sizeof(getter));
+			std::memcpy(image.data() + 0x20, getter, sizeof(getter));
+			// The table at 0x40 holds the two functions; a word outside the code ends it.
+			const auto entry = [&](const std::size_t slot, const std::size_t function)
+			{
+				const auto address = reinterpret_cast<std::uintptr_t>(image.data() + function);
+				const auto value = static_cast<std::uint32_t>(address);
+				std::memcpy(image.data() + 0x40 + slot * 4, &value, 4);
+			};
+			entry(0, 0x00);
+			entry(1, 0x10);
+			entry(2, 0x50);
+			const auto* const table = reinterpret_cast<const void* const*>(image.data() + 0x40);
+			EXPECT_EQ(findSlot(whole, table, "8B 81 A4 00 00 00 C3"), 1u);
+			EXPECT_EQ(findSlot(whole, table, "8B 81 B0 00 00 00 C3"), std::nullopt);
+			// A body two slots share tells neither apart.
+			entry(2, 0x20);
+			entry(3, 0x50);
+			EXPECT_EQ(findSlot(whole, table, "8B 81 A4 00 00 00 C3"), std::nullopt);
 		}
 	}
 }

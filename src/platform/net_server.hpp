@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "platform/image_search.hpp"
+#include "platform/net_server_points.hpp"
 
 namespace openfeslhook::platform
 {
@@ -13,7 +13,7 @@ namespace openfeslhook::platform
 	/// the free connection ids, and starts the thread that handles what arrives. Every frame, the game server handles
 	/// its network: the client build keeps that handling but never calls it. Call it once, from enableDedicatedServer;
 	/// it never throws.
-	/// @param image The game executable as it is mapped.
+	/// @param found Its points, found before any module replaced an entry of the game's tables.
 	/// @return The line to log about what was set up.
-	[[nodiscard]] std::string startNetServer(const Image& image) noexcept;
+	[[nodiscard]] std::string startNetServer(const NetServerPoints& found) noexcept;
 }

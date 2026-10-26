@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "platform/image_search.hpp"
+#include "platform/player_entry_points.hpp"
 
 namespace openfeslhook::platform
 {
@@ -13,7 +13,7 @@ namespace openfeslhook::platform
 	/// game's info and announces it, and sends the server info, after which the game loads the level. It runs from
 	/// the game server's event listener, on the game's main thread. Call it once, from enableDedicatedServer; it
 	/// never throws.
-	/// @param image The game executable as it is mapped.
+	/// @param found Its points, found before any module replaced an entry of the game's tables.
 	/// @return The line to log about what was set up.
-	[[nodiscard]] std::string startPlayerEntry(const Image& image) noexcept;
+	[[nodiscard]] std::string startPlayerEntry(const PlayerEntryPoints& found) noexcept;
 }

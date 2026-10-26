@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
+#include <vector>
 
 #include "platform/image_search.hpp"
 
@@ -15,6 +17,13 @@ namespace openfeslhook::platform
 	/// is null when it was not found.
 	struct PlayerEntryPoints
 	{
+		/// Where the game server's part that GameServer::addLocalPlayer and the connection calls belong to begins,
+		/// which differs between builds; 0 when not found.
+		std::uint32_t partOffset = 0;
+
+		/// Where the game server's event listener part begins; 0 when not found.
+		std::uint32_t listenerOffset = 0;
+
 		/// The virtual-function table of the game server's part that receives the game's events, among them the
 		/// player info of a joining player.
 		const void* const* listenerTable = nullptr;
@@ -94,15 +103,21 @@ namespace openfeslhook::platform
 		/// Tells whether a player name holds a reserved slot.
 		const void* isReserved = nullptr;
 
-		/// Whether every point was found.
-		[[nodiscard]] bool complete() const noexcept;
+		/// The player's virtual-function slot that takes its player info; 0 when not found.
+		std::size_t setInfoSlot = 0;
+
+		/// The player's virtual-function slot that takes the text the game server keeps for it; 0 when not found.
+		std::size_t setServerTextSlot = 0;
+
+		/// The player's virtual-function slot that takes the time it joined; 0 when not found.
+		std::size_t setJoinTimeSlot = 0;
+
+		/// The backend's virtual-function slot that reads its time; 0 when not found.
+		std::size_t backendTimeSlot = 0;
+
+		/// The names of the points that were not found; empty when every point was.
+		[[nodiscard]] std::vector<std::string_view> missing() const;
 	};
-
-	/// Where the game server's part that GameServer::addLocalPlayer and the connection calls belong to begins.
-	inline constexpr std::uint32_t kGameServerPartOffset = 0xB0;
-
-	/// Where the game server's event listener part begins.
-	inline constexpr std::uint32_t kGameServerListenerOffset = 0xB4;
 
 	/// The listener's virtual-function slot that receives an event.
 	inline constexpr std::size_t kListenerReceiveSlot = 0;

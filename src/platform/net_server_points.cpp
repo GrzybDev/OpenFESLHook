@@ -2,6 +2,7 @@
 #include "platform/net_server_points.hpp"
 
 #include <cstdint>
+#include <cstring>
 #include <string_view>
 
 namespace openfeslhook::platform
@@ -12,8 +13,11 @@ namespace openfeslhook::platform
 		constexpr std::size_t kClientInitLength = 0x180;
 		// How far past an allocation its constructor's call comes.
 		constexpr std::size_t kConstructorWindow = 0x20;
-		// The network server check before the net graph setting: cmp (6 bytes) and jz (6 bytes).
+		// The network server check before the net graph setting: cmp [esi+network server], ebx (6 bytes) and jz (6
+		// bytes). Where the game server holds its network server differs between builds.
 		constexpr std::size_t kNetworkCheckLength = 12;
+		constexpr std::string_view kNetworkCheck = "39 9E ?? ?? 00 00 0F 84";
+		constexpr std::size_t kNetworkCheckWindow = 0x30;
 		// Where the game manager listener begins in a Plasma socket manager, after its socket manager and event
 		// listener parts.
 		constexpr std::uint32_t kPlasmaListenerOffset = 8;
@@ -67,22 +71,22 @@ namespace openfeslhook::platform
 
 	bool NetServerPoints::complete() const noexcept
 	{
-		return gameServerTable != nullptr && handleNetwork != nullptr && plasmaListenerTable != nullptr &&
-		       netServerTable != nullptr && filterAgentTable != nullptr && socketManager != nullptr &&
-		       allocate != nullptr && constructConnection != nullptr && constructBitStream != nullptr &&
-		       addFilterAgent != nullptr && startThread != nullptr && pushBack != nullptr && clock != nullptr &&
-		       ping != nullptr && disconnect != nullptr && queueEvent != nullptr && returnConnection != nullptr &&
-		       eraseMapNode != nullptr && lock != nullptr && unlock != nullptr;
+		return gameServerTable != nullptr && handleNetwork != nullptr && netServerField != 0 &&
+		       plasmaListenerTable != nullptr && netServerTable != nullptr && filterAgentTable != nullptr &&
+		       socketManager != nullptr && allocate != nullptr && constructConnection != nullptr &&
+		       constructBitStream != nullptr && addFilterAgent != nullptr && startThread != nullptr &&
+		       pushBack != nullptr && clock != nullptr && ping != nullptr && disconnect != nullptr &&
+		       queueEvent != nullptr && returnConnection != nullptr && eraseMapNode != nullptr && lock != nullptr &&
+		       unlock != nullptr;
 	}
 
 	const void* findHandleNetwork(const Image& image)
 	{
-		// cmp [esi+network server], ebx; jz, then the push of the setting's name.
 		for (const std::uint8_t* const setting : findStrings(image, "GSShowNetGraph"))
 			for (const std::uint8_t* const push : findPushesOf(image, setting))
 			{
 				const std::uint8_t* const check = push - kNetworkCheckLength;
-				if (findSignature(check, kNetworkCheckLength, "39 9E DC 00 00 00 0F 84") != nullptr)
+				if (findSignature(check, kNetworkCheckLength, kNetworkCheck) != nullptr)
 					return functionStart(image.text, push);
 			}
 		return nullptr;
@@ -95,6 +99,10 @@ namespace openfeslhook::platform
 		points.plasmaListenerTable =
 			findVtable(image, ".?AVPlasmaSocketManager@backend@hfe@dice@@", kPlasmaListenerOffset);
 		points.handleNetwork = findHandleNetwork(image);
+		if (points.handleNetwork != nullptr)
+			if (const std::uint8_t* const check = findSignature(static_cast<const std::uint8_t*>(points.handleNetwork),
+			                                                    kNetworkCheckWindow, kNetworkCheck))
+				std::memcpy(&points.netServerField, check + 2, sizeof(points.netServerField));
 		points.netServerTable = findVtable(image, ".?AVNetServer@io@hfe@dice@@");
 		points.filterAgentTable = findVtable(image, ".?AUPunkBusterFilterAgent@io@hfe@dice@@");
 		points.startThread = functionStart(image.text, findPushOf(image, findString(image, "NetServerThread")));

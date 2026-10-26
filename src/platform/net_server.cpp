@@ -47,9 +47,6 @@ namespace openfeslhook::platform
 		constexpr std::size_t kConnections = 0x574;
 		constexpr std::size_t kFilterChain = 0x57C;
 
-		// The game server's network server.
-		constexpr std::size_t kGameServerNetServer = 0xDC;
-
 		// A connection's fields: when it last sent anything, when it was last pinged and how far it has come.
 		constexpr std::size_t kLastHeard = 0x7C;
 		constexpr std::size_t kLastPing = 0x84;
@@ -306,7 +303,7 @@ namespace openfeslhook::platform
 		// come back, as the connection and its id were never freed. This does it once a frame, under the same lock.
 		void lookAfterConnections(std::uint8_t* game)
 		{
-			auto* const server = read<std::uint8_t*>(game + kGameServerNetServer);
+			auto* const server = read<std::uint8_t*>(game + points.netServerField);
 			if (server == nullptr || server[kInitialized] == 0 || upkeepFailed)
 				return;
 			as<LockType>(points.lock)(server + kLock);
@@ -362,11 +359,11 @@ namespace openfeslhook::platform
 		}
 	}
 
-	std::string startNetServer(const Image& image) noexcept
+	std::string startNetServer(const NetServerPoints& found) noexcept
 	{
 		try
 		{
-			points = locateNetServerPoints(image);
+			points = found;
 			if (!points.complete())
 				return std::format(
 					"The dedicated server will not accept players: the parts of the game server's networking were not "
@@ -374,7 +371,7 @@ namespace openfeslhook::platform
 					"{}, filter agent {}, socket manager {}, allocation {}, connection {}, bit stream {}, filter chain "
 					"{}, thread {}, id queue {}, connection upkeep {}).",
 					points.gameServerTable != nullptr ? "found" : "missing",
-					points.handleNetwork != nullptr ? "found" : "missing",
+					points.handleNetwork != nullptr && points.netServerField != 0 ? "found" : "missing",
 					points.plasmaListenerTable != nullptr ? "found" : "missing",
 					points.netServerTable != nullptr ? "found" : "missing",
 					points.filterAgentTable != nullptr ? "found" : "missing",
