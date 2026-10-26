@@ -46,6 +46,8 @@
     <ClCompile Include="frame_tests.cpp" />
     <ClCompile Include="game_tls_tests.cpp" />
     <ClCompile Include="http_tests.cpp" />
+    <ClCompile Include="image_search_tests.cpp" />
+    <ClCompile Include="..\src\platform\image_search.cpp" />
     <ClCompile Include="ipv4_preference_tests.cpp" />
     <ClCompile Include="local_services_tests.cpp" />
     <ClCompile Include="main.cpp" />

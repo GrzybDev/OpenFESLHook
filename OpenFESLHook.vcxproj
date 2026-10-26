@@ -61,6 +61,7 @@
     <ClInclude Include="src\platform\dedicated_server.hpp" />
     <ClInclude Include="src\platform\detour.hpp" />
     <ClInclude Include="src\platform\host_redirect.hpp" />
+    <ClInclude Include="src\platform\image_search.hpp" />
     <ClInclude Include="src\platform\ipv4_look_ups.hpp" />
     <ClInclude Include="src\platform\text.hpp" />
     <ClInclude Include="src\platform\winhttp.hpp" />
@@ -82,6 +83,7 @@
     <ClCompile Include="src\platform\dedicated_server.cpp" />
     <ClCompile Include="src\platform\detour.cpp" />
     <ClCompile Include="src\platform\host_redirect.cpp" />
+    <ClCompile Include="src\platform\image_search.cpp" />
     <ClCompile Include="src\platform\ipv4_look_ups.cpp" />
     <ClCompile Include="src\platform\text.cpp" />
     <ClCompile Include="src\platform\winhttp.cpp" />
