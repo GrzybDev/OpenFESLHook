@@ -74,6 +74,19 @@ A length below 12 or above 1 MiB breaks the stream's framing; the hook then clos
 
 The game's HTTP requests do not use the WebSocket. The hook sends them to the relay server's host and port, over `https://` when `Server.Url` is `wss://` and `http://` when it is `ws://`, with the method, path, query, body and headers the game sent, and the game's `Host` header as `X-OpenFESL-Host`. The header is the hook's own because proxies in front of a server, such as Traefik, drop the `X-Forwarded-*` headers of a peer they do not trust and set `X-Forwarded-Host` to the host they were reached at; a server routes the game's requests by `X-OpenFESL-Host` and its path. The server's status, headers and body go back to the game. When the server cannot be reached, the game gets `502 Bad Gateway`.
 
+## Launcher sign-in
+
+The Battlefield Heroes launcher asks the relay server for a session over HTTP, at the same host and port as the game's HTTP requests: `POST /launcher/session` with the user agent `OpenFESLHook/<version> (Windows)` and a JSON body.
+
+| Field      | Value                                           |
+|:-----------|:------------------------------------------------|
+| `game`     | `bfheroes`                                      |
+| `role`     | `play` to join games, `host` to run a server    |
+| `account`  | The account name the player entered             |
+| `password` | The password the player entered                 |
+
+A server grants the session with `200` and a JSON body holding `sessionId` and, optionally, `personaName`. The launcher starts the game with `+sessionId`, and a server also with the account, its password and the persona as the server's soldier (the account name when `personaName` is missing). Any other status, or a `200` without `sessionId`, refuses the sign-in; an `error` field names the reason, and the launcher shows its own message for `wrong-sign-in`, `unknown-game`, `disabled`, `banned`, `deactivated` and `no-persona`, and a general one otherwise.
+
 ## What the game needs from a server
 
 - Theater addresses in FESL answers have to be host names the hook redirects, such as the game's own name below `theater.ea.com`, not IP addresses: the hook only learns about connections to the addresses it handed out. Any port works, since the hook listens on the one the game connects to.

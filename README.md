@@ -23,7 +23,7 @@ The hook knows no game in particular: it serves every host below the FESL and Th
 | Game                       | Releases                                                    | Tried |
 |:---------------------------|:------------------------------------------------------------|:-----:|
 | Battlefield: Bad Company 2 | Windows client (Steam, Origin, EA app) and dedicated server | yes   |
-| Battlefield Heroes         | Windows client and dedicated server (game versions up to 1.89)   | yes   |
+| Battlefield Heroes         | Windows client and dedicated server (game versions 1.46 and 1.89) | yes  |
 
 Other FESL games for Windows that meet both conditions may work as they are, or with their hosts in [Configuration](#hosts).
 
@@ -45,7 +45,10 @@ Features
 - Reaches the relay server's host name over IPv4 first, so that the server learns each player's IPv4 address even where the name also has IPv6 addresses; a request that cannot get through over IPv4 is sent again over every address family, and IPv4 is given up once IPv6 got through where IPv4 did not
 - Sends chosen hosts straight to other servers as the game's own packets, over plain TCP or re-encrypted with TLS 1.2 or later
 - Changes none of a client's code, so the client works the same with every release of a game
-- Starts a dedicated server whose own start-up code cannot run without a display (Battlefield Heroes) by patching that code in memory, found by signature so it keeps working across the game's releases, and only when the game is launched as a server
+- Starts a dedicated server whose own start-up code cannot run without a display (Battlefield Heroes) by patching that code in memory, only when the game is launched as a server
+- Gives Battlefield Heroes' client, run as a dedicated server, the server parts it lacks, as the 1.42 server build has them: it lists the server's game in Theater, accepts players on the server's port, takes them into the game, and pings them and drops the silent ones, so a player who leaves can come back
+- Finds everything it changes in a game's code by signature, string and run-time type, including what moves between a game's releases, so one hook serves each release tried
+- Starts Battlefield Heroes from a launcher window when the game is started without a session, as from the game's own shortcut: signs in at the relay server and starts the game, or a dedicated server to host
 - Optional log to a console and to a file, from the hook's start and each game connection down to every packet with its fields and every HTTP request with its headers, tagged and coloured by topic, with passwords, login keys and session tickets hidden
 
 Build Requirements
@@ -145,6 +148,16 @@ When the game starts, the hook:
 5. Opens a WebSocket to the relay server with the game's first FESL or Theater connection, carries every packet in it and closes it with the last connection; when the relay server goes away, the game's connections close and the game connects again
 6. Passes the game's HTTP requests on and its DirectInput calls to the system's `dinput8.dll`
 
+### Battlefield Heroes
+
+Started without `+sessionId`, `BFHeroes.exe` opens the hook's launcher instead of closing:
+1. Choose Play to join a game or Server to host one
+2. Enter the account and password the relay server knows; Remember me keeps the mode, account, language, map and ranked choice in `%LOCALAPPDATA%\OpenFESLHook\bfheroes.ini`, never the password
+3. Choose the game's language (System default follows Windows), and for a server a map from its `maplist.con` (or the server's own map list) and whether it is ranked
+4. The launcher signs in at the relay server ([Launcher sign-in](docs/relay-protocol.md#launcher-sign-in)), starts the game or the server with the session it was given and closes; a refused sign-in shows the server's reason
+
+A server, started this way or by hand with `+dedicated 1`, shows only its console. Once it has logged in, it lists its game in Theater as the server builds named theirs, `[data center]name(IP:port)`, from `sv.serverName`, `sv.serverIP` (`(unknown)` when empty), `sv.serverPort` and `sv.maxPlayers`, and accepts players on `sv.serverPort`; with `sv.serverIP` empty, it listens on every network interface. A build in which the hook does not find every part it needs runs on without that part, and the log names what was missing.
+
 File formats
 ------------
 
@@ -160,3 +173,4 @@ Thanks to:
 
 Special thanks to:
 - EA DICE and Electronic Arts (for making Battlefield: Bad Company 2)
+- Easy Studios and Electronic Arts (for making Battlefield Heroes)
