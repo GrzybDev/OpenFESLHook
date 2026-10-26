@@ -51,13 +51,16 @@
       <SubSystem>Windows</SubSystem>
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>src\exports.def</ModuleDefinitionFile>
-      <AdditionalDependencies>winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;comctl32.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\app\log_output.hpp" />
     <ClInclude Include="src\app\open_fesl_hook.hpp" />
     <ClInclude Include="src\app\settings.hpp" />
+    <ClInclude Include="src\launcher\dialog.hpp" />
+    <ClInclude Include="src\launcher\launcher.hpp" />
+    <ClInclude Include="src\launcher\session.hpp" />
     <ClInclude Include="src\platform\dedicated_server.hpp" />
     <ClInclude Include="src\platform\detour.hpp" />
     <ClInclude Include="src\platform\host_redirect.hpp" />
@@ -77,6 +80,9 @@
     <ClCompile Include="src\app\settings.cpp" />
     <ClCompile Include="src\direct_input.cpp" />
     <ClCompile Include="src\dllmain.cpp" />
+    <ClCompile Include="src\launcher\dialog.cpp" />
+    <ClCompile Include="src\launcher\launcher.cpp" />
+    <ClCompile Include="src\launcher\session.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>

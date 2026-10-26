@@ -13,6 +13,15 @@ namespace openfeslhook::platform
 	/// @throws std::runtime_error When MinHook cannot install the detour.
 	void installDetour(const wchar_t* module, const char* function, void* replacement, void** original);
 
+	/// Detours a function at a known address in the process, starting MinHook first if no detour has; the detour stays
+	/// for as long as the process runs. The target is an address rather than a library export, for a function the game
+	/// keeps to itself.
+	/// @param target The function to detour.
+	/// @param replacement The function that runs instead.
+	/// @param original Receives the function that carries on as the original did, before the detour is turned on.
+	/// @throws std::runtime_error When MinHook cannot install the detour.
+	void installDetourAt(void* target, void* replacement, void** original);
+
 	/// Detours a function that a system library exports, as installDetour does, with a replacement of the original's
 	/// type.
 	/// @param module The library, such as L"ws2_32".

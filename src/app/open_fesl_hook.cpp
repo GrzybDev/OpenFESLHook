@@ -4,6 +4,7 @@
 #include "app/log_output.hpp"
 #include "app/settings.hpp"
 #include "http/masking.hpp"
+#include "launcher/launcher.hpp"
 #include "logging/log.hpp"
 #include "net/local_services.hpp"
 #include "platform/dedicated_server.hpp"
@@ -118,6 +119,9 @@ namespace openfeslhook::app
 			          platform::narrow(modulePath(nullptr).filename().wstring()), GetCurrentProcessId());
 			// A dedicated server, if any, was already patched in DllMain; its outcome is logged now that the log is open.
 			for (const std::string& message : platform::dedicatedServerMessages())
+				log::info(log::Topic::Hook, "{}", message);
+			// The launcher, if the game has the launch gate, was set up in DllMain alongside it.
+			for (const std::string& message : launcher::launcherMessages())
 				log::info(log::Topic::Hook, "{}", message);
 			if (outputs.file)
 				log::info(log::Topic::Hook, "The log file is {}", platform::narrow(outputs.file->wstring()));

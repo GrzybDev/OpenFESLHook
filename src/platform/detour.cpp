@@ -26,4 +26,12 @@ namespace openfeslhook::platform
 		      std::format("hook {}!{}", narrow(module), function));
 		check(MH_EnableHook(target), std::format("turn the detour of {}!{} on", narrow(module), function));
 	}
+
+	void installDetourAt(void* target, void* replacement, void** original)
+	{
+		if (const MH_STATUS status = MH_Initialize(); status != MH_ERROR_ALREADY_INITIALIZED)
+			check(status, "start");
+		check(MH_CreateHook(target, replacement, original), "hook a function in the game");
+		check(MH_EnableHook(target), "turn a detour of the game on");
+	}
 }

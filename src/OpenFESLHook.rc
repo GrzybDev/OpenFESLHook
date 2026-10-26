@@ -1,3 +1,5 @@
+#include <windows.h>
+
 #include "resource.h"
 
 STRINGTABLE
@@ -6,4 +8,66 @@ BEGIN
 	IDS_START_PROBLEMS "OpenFESLHook found problems while starting and runs on as each line describes:"
 	IDS_START_FAILED "OpenFESLHook could not start, so the game runs without it:"
 	IDS_LOG_HINT "Console=1 or File=1 in the [Log] section of OpenFESLHook.ini shows these lines in the hook's log."
+
+	IDS_LAUNCHER_PLAY "Play"
+	IDS_LAUNCHER_HOST "Host"
+	IDS_LAUNCHER_CONNECTING "Signing in..."
+	IDS_LAUNCHER_NEED_ACCOUNT "Enter an account and a password."
+	IDS_LAUNCHER_NO_SERVER "The server could not be reached."
+	IDS_LAUNCHER_FAILED "Sign-in failed."
+	IDS_LAUNCHER_WRONG_SIGN_IN "The account name or password is wrong."
+	IDS_LAUNCHER_UNKNOWN_GAME "The server does not serve Battlefield Heroes."
+	IDS_LAUNCHER_DISABLED "The account is disabled."
+	IDS_LAUNCHER_BANNED "The account is banned."
+	IDS_LAUNCHER_DEACTIVATED "The account was deactivated."
+	IDS_LAUNCHER_NO_SOLDIER "No soldier could be made for the account."
+
+	IDS_LANG_SYSTEM "System default"
+	IDS_LANG_ENGLISH "English"
+	IDS_LANG_GERMAN "German"
+	IDS_LANG_FRENCH "French"
+	IDS_LANG_ITALIAN "Italian"
+	IDS_LANG_POLISH "Polish"
+	IDS_LANG_PORTUGUESE "Portuguese"
+	IDS_LANG_RUSSIAN "Russian"
+	IDS_LANG_SPANISH "Spanish"
+	IDS_LANG_TURKISH "Turkish"
+	IDS_LANG_DUTCH "Dutch"
+	IDS_LANG_BRAZILIAN "Brazilian Portuguese"
+
+	IDS_TILE_PLAY "Play"
+	IDS_TILE_PLAY_SUB "Join a game"
+	IDS_TILE_HOST "Server"
+	IDS_TILE_HOST_SUB "Host a server"
+	IDS_MAP_DEFAULT "Server's map list"
+END
+
+IDR_LAUNCHER_MANIFEST RT_MANIFEST "launcher.manifest"
+
+IDD_LAUNCHER DIALOGEX 0, 0, 300, 210
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "OpenFESLHook"
+FONT 9, "Segoe UI", 400, 0, 1
+BEGIN
+	CONTROL "Play", IDC_MODE_PLAY, "BUTTON",
+	        BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE | BS_CENTER | BS_VCENTER | WS_GROUP | WS_TABSTOP, 10, 8, 135, 36
+	CONTROL "Server", IDC_MODE_HOST, "BUTTON",
+	        BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE | BS_CENTER | BS_VCENTER | WS_TABSTOP, 155, 8, 135, 36
+
+	LTEXT "Account", IDC_STATIC, 10, 54, 55, 9
+	EDITTEXT IDC_ACCOUNT, 70, 52, 220, 13, ES_AUTOHSCROLL | WS_GROUP | WS_TABSTOP
+	LTEXT "Password", IDC_STATIC, 10, 72, 55, 9
+	EDITTEXT IDC_PASSWORD, 70, 70, 220, 13, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+	CONTROL "Remember me", IDC_REMEMBER, "BUTTON", BS_AUTOCHECKBOX | WS_TABSTOP, 70, 88, 150, 10
+
+	LTEXT "Language", IDC_STATIC, 10, 106, 55, 9
+	COMBOBOX IDC_LANGUAGE, 70, 104, 150, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+	LTEXT "Map", IDC_MAP_LABEL, 10, 124, 55, 9
+	COMBOBOX IDC_MAP, 70, 122, 150, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+	CONTROL "Ranked", IDC_RANKED, "BUTTON", BS_AUTOCHECKBOX | WS_TABSTOP, 70, 140, 150, 10
+
+	LTEXT "", IDC_STATUS, 10, 164, 165, 38
+	DEFPUSHBUTTON "Play", IDOK, 182, 189, 52, 14
+	PUSHBUTTON "Cancel", IDCANCEL, 240, 189, 52, 14
 END
