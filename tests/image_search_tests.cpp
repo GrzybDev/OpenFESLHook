@@ -128,12 +128,23 @@ namespace openfeslhook::platform
 			const std::uint32_t resolution = 0x55667788; // slot 0x3c
 			put(0x80, reinterpret_cast<const std::uint8_t*>(&first), 4);
 			put(0x80 + 0x3C, reinterpret_cast<const std::uint8_t*>(&resolution), 4);
+
+			// The table of the part of the object at offset 8, a second base, has its own locator at 0x20.
+			const std::uint32_t baseOffset = 8;
+			const std::uint32_t baseFirst = 0x99AABBCC;
+			put(0x24, reinterpret_cast<const std::uint8_t*>(&baseOffset), 4);
+			putPointer(0x2C, 0x100);                     // locator -> type descriptor
+			putPointer(0x13C, 0x20);                     // base table's locator slot -> the locator
+			put(0x140, reinterpret_cast<const std::uint8_t*>(&baseFirst), 4);
 			const Image whole{.base = base, .size = image.size(), .text = base, .textSize = image.size()};
 
 			const void* const* const table = findVtable(whole, name);
 			ASSERT_NE(table, nullptr);
 			EXPECT_EQ(reinterpret_cast<std::uintptr_t>(table[0]), first);
 			EXPECT_EQ(reinterpret_cast<std::uintptr_t>(table[0x3C / sizeof(void*)]), resolution);
+			const void* const* const baseTable = findVtable(whole, name, baseOffset);
+			ASSERT_NE(baseTable, nullptr);
+			EXPECT_EQ(reinterpret_cast<std::uintptr_t>(baseTable[0]), baseFirst);
 		}
 	}
 }

@@ -203,7 +203,7 @@ namespace openfeslhook::platform
 		return nullptr;
 	}
 
-	const void* const* findVtable(const Image& image, const std::string_view decoratedName)
+	const void* const* findVtable(const Image& image, const std::string_view decoratedName, const std::uint32_t offset)
 	{
 		// A type descriptor holds a vtable pointer and a spare pointer, then the decorated name.
 		const std::uint8_t* const name = findString(image, decoratedName);
@@ -217,8 +217,8 @@ namespace openfeslhook::platform
 			if (reference - image.base < 12)
 				continue;
 			const std::uint8_t* const locator = reference - 12;
-			if (readDword(locator) != 0 || readDword(locator + 4) != 0)
-				continue; // not a locator, or the table of a base class within the object
+			if (readDword(locator) != 0 || readDword(locator + 4) != offset)
+				continue; // not a locator, or the table of another part of the object
 			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(locator));
 			if (const std::uint8_t* const slot = findBytes(image.base, image.size, &address, sizeof address))
 				return reinterpret_cast<const void* const*>(slot + 4);

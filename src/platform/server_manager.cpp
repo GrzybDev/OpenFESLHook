@@ -3,13 +3,13 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <format>
 #include <string_view>
 
 #include <windows.h>
 
 #include "logging/log.hpp"
+#include "platform/game_objects.hpp"
 #include "platform/server_manager_points.hpp"
 
 namespace openfeslhook::platform
@@ -63,49 +63,6 @@ namespace openfeslhook::platform
 		Stage stage = Stage::WaitingForLogin;
 		ULONGLONG settledAt = 0;
 
-		template <typename T>
-		T read(const std::uint8_t* at) noexcept
-		{
-			T value{};
-			std::memcpy(&value, at, sizeof(T));
-			return value;
-		}
-
-		template <typename T>
-		void write(std::uint8_t* at, const T value) noexcept
-		{
-			std::memcpy(at, &value, sizeof(T));
-		}
-
-		template <typename Function>
-		Function slot(const void* object, const std::size_t index) noexcept
-		{
-			return reinterpret_cast<Function>((*static_cast<void* const* const*>(object))[index]);
-		}
-
-		bool readable(const void* at, const std::size_t length) noexcept
-		{
-			MEMORY_BASIC_INFORMATION region{};
-			if (at == nullptr || VirtualQuery(at, &region, sizeof(region)) == 0 || region.State != MEM_COMMIT)
-				return false;
-			constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ |
-			                            PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
-			const auto* const end = static_cast<const std::uint8_t*>(region.BaseAddress) + region.RegionSize;
-			return (region.Protect & kReadable) != 0 && (region.Protect & PAGE_GUARD) == 0 &&
-			       static_cast<const std::uint8_t*>(at) + length <= end;
-		}
-
-		// The game's std::string is msvcp90's: four bytes, then the characters in place when they fit in sixteen
-		// bytes or else a pointer to them, then the length and the capacity.
-		std::string gameString(const std::uint8_t* at)
-		{
-			const auto length = read<std::uint32_t>(at + 0x14);
-			const auto capacity = read<std::uint32_t>(at + 0x18);
-			const auto* const characters =
-				capacity < 16 ? reinterpret_cast<const char*>(at + 4) : read<const char*>(at + 4);
-			return readable(characters, length) ? std::string(characters, length) : std::string();
-		}
-
 		// The first object among the pointers at the start of `owner` whose class is `table`, or nullptr. The game
 		// keeps its settings objects behind such pointers; their classes are known by their run-time types, their
 		// places in the owner are not.
@@ -145,13 +102,13 @@ namespace openfeslhook::platform
 				return;
 			}
 
-			std::string ip = gameString(serverSettings + kServerIp);
+			std::string ip = readGameString(serverSettings + kServerIp);
 			const auto port = read<std::int32_t>(serverSettings + kServerPort);
 			const auto maxPlayers = read<std::int32_t>(serverSettings + kMaxPlayers);
 			// The server build names its game this way; the game's server browser shows it.
 			const std::string name =
-				std::format("[{}]{}({}:{})", gameString(serverGameSettings + kDataCenter),
-				            gameString(serverSettings + kServerName), ip.empty() ? "(unknown)" : ip, port);
+				std::format("[{}]{}({}:{})", readGameString(serverGameSettings + kDataCenter),
+				            readGameString(serverSettings + kServerName), ip.empty() ? "(unknown)" : ip, port);
 
 			std::uint8_t* const params = serverGameSettings + kCreateGameParams;
 			const std::size_t copied = std::min(name.size(), kNameCapacity - 1);
@@ -222,20 +179,6 @@ namespace openfeslhook::platform
 				stage = Stage::Created;
 				log::warning(log::Topic::Hook, "Dedicated server: hosting stopped: {}", problem.what());
 			}
-		}
-
-		// Points an entry of a virtual-function table elsewhere, keeping the function it held. The table is the
-		// game's own, so every object of the class calls the replacement.
-		bool replaceEntry(const void* const* slot, void* replacement, void*& original)
-		{
-			auto* const entry = const_cast<void**>(slot);
-			DWORD protection = 0;
-			if (VirtualProtect(entry, sizeof(void*), PAGE_READWRITE, &protection) == 0)
-				return false;
-			original = *entry;
-			*entry = replacement;
-			VirtualProtect(entry, sizeof(void*), protection, &protection);
-			return true;
 		}
 	}
 

@@ -14,6 +14,7 @@
 #include <windows.h>
 
 #include "platform/image_search.hpp"
+#include "platform/net_server_points.hpp"
 #include "platform/server_manager_points.hpp"
 #include "platform/server_patch_points.hpp"
 
@@ -198,6 +199,35 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, *points.gameManagerListen), 0x516068u);
 			// The update the server manager ticks from, reached through the rebased table.
 			EXPECT_EQ(rva(image, points.backendTable[kBackendUpdateSlot]), 0xB84B9u);
+		}
+
+		TEST(DedicatedServer, LocatesTheGameServerNetworkingInTheClientExecutable)
+		{
+			const std::optional<std::vector<std::uint8_t>> mapped = loadedFrom("OPENFESLHOOK_TEST_BFHEROES_EXE");
+			if (!mapped)
+				GTEST_SKIP() << "set OPENFESLHOOK_TEST_BFHEROES_EXE to a BFHeroes.exe to run this";
+			ASSERT_FALSE(mapped->empty()) << "OPENFESLHOOK_TEST_BFHEROES_EXE names no readable PE32 image";
+			const Image image = imageOf(*mapped);
+			ASSERT_NE(image.text, nullptr);
+
+			const NetServerPoints points = locateNetServerPoints(image);
+			ASSERT_TRUE(points.complete());
+			EXPECT_EQ(rva(image, points.gameServerTable), 0x9AC2A4u);
+			EXPECT_EQ(rva(image, points.gameServerTable[kGameServerUpdateSlot]), 0x0ED57Du);
+			EXPECT_EQ(rva(image, points.handleNetwork), 0x0E9FBCu);
+			EXPECT_EQ(rva(image, points.plasmaListenerTable), 0xA13DCCu);
+			EXPECT_EQ(rva(image, points.plasmaListenerTable[kPlasmaReceiveSlot]), 0x2817BDu);
+			EXPECT_EQ(rva(image, points.netServerTable), 0xAA95ACu);
+			// The client build's init is a stub that reports a failure.
+			EXPECT_EQ(rva(image, points.netServerTable[kNetServerInitSlot]), 0x44D49Fu);
+			EXPECT_EQ(rva(image, points.filterAgentTable), 0xAAB288u);
+			EXPECT_EQ(rva(image, points.socketManager), 0xE272BCu);
+			EXPECT_EQ(rva(image, points.allocate), 0x038D2u);
+			EXPECT_EQ(rva(image, points.constructConnection), 0x46F0D2u);
+			EXPECT_EQ(rva(image, points.constructBitStream), 0x43A46Au);
+			EXPECT_EQ(rva(image, points.addFilterAgent), 0x4502F9u);
+			EXPECT_EQ(rva(image, points.startThread), 0x44DC02u);
+			EXPECT_EQ(rva(image, points.pushBack), 0x0AF8E3u);
 		}
 	}
 }

@@ -89,9 +89,11 @@ namespace openfeslhook::platform
 	                                                 const std::uint8_t* within) noexcept;
 
 	/// The table of virtual functions of a class, found through the run-time type information the compiler emits for
-	/// it, or nullptr when the image has none for that class. It is the class's primary table, the one an object of
-	/// exactly that class points to first.
+	/// it, or nullptr when the image has none for that class. By default it is the class's primary table, the one an
+	/// object of exactly that class points to first; a class with several bases has another table for each base part.
 	/// @param image The image.
 	/// @param decoratedName The class's decorated type name, such as ".?AVVideoSettings@hfe@dice@@".
-	[[nodiscard]] const void* const* findVtable(const Image& image, std::string_view decoratedName);
+	/// @param offset Where, in the object, the part whose table is wanted begins; 0 for the primary table.
+	[[nodiscard]] const void* const* findVtable(const Image& image, std::string_view decoratedName,
+	                                            std::uint32_t offset = 0);
 }

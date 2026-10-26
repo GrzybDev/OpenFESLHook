@@ -14,6 +14,7 @@
 #include "logging/log.hpp"
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
+#include "platform/net_server.hpp"
 #include "platform/server_manager.hpp"
 #include "platform/server_patch_points.hpp"
 
@@ -226,6 +227,7 @@ namespace openfeslhook::platform
 			hideWindows();
 			allowSeveralServers();
 			messages.push_back(startServerManager(image));
+			messages.push_back(startNetServer(image));
 
 			const auto base = reinterpret_cast<std::uintptr_t>(image.base);
 			messages.push_back(std::format(
