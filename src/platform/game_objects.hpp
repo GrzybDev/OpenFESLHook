@@ -49,6 +49,22 @@ namespace openfeslhook::platform
 	/// @return Whether the entry could be written.
 	bool replaceEntry(const void* const* entry, void* replacement, void*& original) noexcept;
 
+	/// A std::map node of msvcp90 whose key and value take four bytes each: its links, the key and the value, then its
+	/// colour and whether it is the map's header.
+	struct GameMapNode
+	{
+		static constexpr std::size_t left = 0x00;
+		static constexpr std::size_t parent = 0x04;
+		static constexpr std::size_t right = 0x08;
+		static constexpr std::size_t key = 0x0C;
+		static constexpr std::size_t value = 0x10;
+		static constexpr std::size_t isHeader = 0x15;
+	};
+
+	/// The node that follows a node of one of the game's std::maps in key order, the map's header after the last.
+	/// @param node The node.
+	[[nodiscard]] const std::uint8_t* nextGameMapNode(const std::uint8_t* node) noexcept;
+
 	/// The size of the game's std::string, which is msvcp90's: four bytes, then the characters in place when they fit
 	/// in sixteen bytes or else a pointer to them, then the length and the capacity.
 	inline constexpr std::size_t kGameStringSize = 0x1C;

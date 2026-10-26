@@ -229,6 +229,15 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.addFilterAgent), 0x4502F9u);
 			EXPECT_EQ(rva(image, points.startThread), 0x44DC02u);
 			EXPECT_EQ(rva(image, points.pushBack), 0x0AF8E3u);
+			EXPECT_EQ(rva(image, points.netServerTable[kNetServerPollSlot]), 0x44F377u);
+			EXPECT_EQ(rva(image, points.clock), 0x44D33Eu);
+			EXPECT_EQ(rva(image, points.ping), 0x44E09Eu);
+			EXPECT_EQ(rva(image, points.disconnect), 0x44E272u);
+			EXPECT_EQ(rva(image, points.queueEvent), 0x44E369u);
+			EXPECT_EQ(rva(image, points.returnConnection), 0x44DBB4u);
+			EXPECT_EQ(rva(image, points.eraseMapNode), 0x078F8Au);
+			EXPECT_EQ(rva(image, points.lock), 0x48E17Du);
+			EXPECT_EQ(rva(image, points.unlock), 0x48E186u);
 		}
 
 		TEST(DedicatedServer, LocatesThePlayerEntryPartsInTheClientExecutable)

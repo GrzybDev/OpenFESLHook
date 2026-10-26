@@ -63,6 +63,25 @@ namespace openfeslhook::platform
 		return true;
 	}
 
+	const std::uint8_t* nextGameMapNode(const std::uint8_t* node) noexcept
+	{
+		using Node = const std::uint8_t*;
+		if (const auto right = read<Node>(node + GameMapNode::right); right[GameMapNode::isHeader] == 0)
+		{
+			node = right;
+			while (read<Node>(node + GameMapNode::left)[GameMapNode::isHeader] == 0)
+				node = read<Node>(node + GameMapNode::left);
+			return node;
+		}
+		auto parent = read<Node>(node + GameMapNode::parent);
+		while (parent[GameMapNode::isHeader] == 0 && node == read<Node>(parent + GameMapNode::right))
+		{
+			node = parent;
+			parent = read<Node>(node + GameMapNode::parent);
+		}
+		return parent;
+	}
+
 	std::string readGameString(const std::uint8_t* at)
 	{
 		const auto length = read<std::uint32_t>(at + 0x14);

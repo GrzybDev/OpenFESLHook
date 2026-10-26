@@ -73,14 +73,6 @@ namespace openfeslhook::platform
 		constexpr std::int32_t kProfilePlayingElsewhere = 0x20;
 		constexpr std::int32_t kMadeRoom = 0x23; // also the reason a PrePlayerConnect script's kick is given
 
-		// A std::map node of msvcp90: links, the key and the value, then the colour and whether it is the header.
-		constexpr std::size_t kNodeLeft = 0x00;
-		constexpr std::size_t kNodeParent = 0x04;
-		constexpr std::size_t kNodeRight = 0x08;
-		constexpr std::size_t kNodeKey = 0x0C;
-		constexpr std::size_t kNodeValue = 0x10;
-		constexpr std::size_t kNodeIsHeader = 0x15;
-
 		using ObjectType = void*(__thiscall*)(void*);
 		using ObjectOfType = void*(__thiscall*)(void*, std::int32_t);
 		using IntegerType = std::int32_t(__thiscall*)(void*);
@@ -136,30 +128,6 @@ namespace openfeslhook::platform
 			return slot<LookupType>(registry, kRegistryLookupSlot)(registry, key.get());
 		}
 
-		const std::uint8_t* field(const std::uint8_t* node, const std::size_t at) noexcept
-		{
-			return read<const std::uint8_t*>(node + at);
-		}
-
-		// The in-order successor of a msvcp90 std::map node.
-		const std::uint8_t* nextNode(const std::uint8_t* node) noexcept
-		{
-			if (field(node, kNodeRight)[kNodeIsHeader] == 0)
-			{
-				node = field(node, kNodeRight);
-				while (field(node, kNodeLeft)[kNodeIsHeader] == 0)
-					node = field(node, kNodeLeft);
-				return node;
-			}
-			const std::uint8_t* parent = field(node, kNodeParent);
-			while (parent[kNodeIsHeader] == 0 && node == field(parent, kNodeRight))
-			{
-				node = parent;
-				parent = field(node, kNodeParent);
-			}
-			return parent;
-		}
-
 		// A full server lets a player on a reserved slot in by dropping the connection with the highest id whose
 		// player holds none, or refuses the newcomer when there is none; either way the entry then carries on, as in
 		// the 1.42 server build.
@@ -169,14 +137,15 @@ namespace openfeslhook::platform
 			const auto isReserved = as<IsReservedType>(points.isReserved);
 			const auto* const header = read<const std::uint8_t*>(game + kConnections);
 			std::int32_t victim = -1;
-			for (const std::uint8_t* node = field(header, kNodeLeft); node != header; node = nextNode(node))
+			for (auto node = read<const std::uint8_t*>(header + GameMapNode::left); node != header;
+			     node = nextGameMapNode(node))
 			{
-				void* const link = read<void*>(node + kNodeValue);
+				void* const link = read<void*>(node + GameMapNode::value);
 				void* const player = slot<ObjectType>(link, kPlayerOfConnectionSlot)(link);
 				if (player == nullptr)
 					continue;
 				const void* const name = slot<ObjectType>(player, kPlayerNameSlot)(player);
-				const auto id = read<std::int32_t>(node + kNodeKey);
+				const auto id = read<std::int32_t>(node + GameMapNode::key);
 				if (!isReserved(reserved, name) && id > victim)
 					victim = id;
 			}

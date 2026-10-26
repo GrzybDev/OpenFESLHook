@@ -6,9 +6,10 @@ namespace openfeslhook::platform
 {
 	/// Where, in the game executable, the parts of the game server's networking live. The client build that runs as a
 	/// headless server has the network server whole except its init, which opens the socket the players' games connect
-	/// to; the parts that init is made of are there, and the client's own NetClient::init builds its connection from
-	/// most of them, which is where they are found. The game server's handling of its players' connections is there
-	/// too, though nothing calls it. A field is null when it was not found.
+	/// to, and its upkeep of the connections; the parts both are made of are there, and the client's own
+	/// NetClient::init builds its connection from most of the init's, which is where those are found. The game
+	/// server's handling of its players' connections is there too, though nothing calls it. A field is null when it
+	/// was not found.
 	struct NetServerPoints
 	{
 		/// The primary virtual-function table of the game server, whose per-frame update the 1.42 server build handles
@@ -50,12 +51,40 @@ namespace openfeslhook::platform
 		/// Appends a value to a std::deque of four-byte values.
 		const void* pushBack = nullptr;
 
+		/// Reads a network server's clock: the milliseconds since it started listening.
+		const void* clock = nullptr;
+
+		/// Sends a connection a ping.
+		const void* ping = nullptr;
+
+		/// Disconnects a connection, which leaves the network server at its next upkeep.
+		const void* disconnect = nullptr;
+
+		/// Hands the game server an event about a connection the next time it asks for one.
+		const void* queueEvent = nullptr;
+
+		/// Puts a connection back among the network server's free ones.
+		const void* returnConnection = nullptr;
+
+		/// Erases a node from a std::map whose keys and values take four bytes each.
+		const void* eraseMapNode = nullptr;
+
+		/// Takes one of the network server's locks.
+		const void* lock = nullptr;
+
+		/// Releases one of the network server's locks.
+		const void* unlock = nullptr;
+
 		/// Whether every point was found.
 		[[nodiscard]] bool complete() const noexcept;
 	};
 
 	/// The network server's virtual-function slot of its init, which opens the listening socket.
 	inline constexpr std::size_t kNetServerInitSlot = 0x10 / sizeof(void*);
+
+	/// The network server's virtual-function slot that reads what arrived for its connections, which its network
+	/// thread does each time it wakes.
+	inline constexpr std::size_t kNetServerPollSlot = 0x2C / sizeof(void*);
 
 	/// The game server's virtual-function slot of its per-frame update.
 	inline constexpr std::size_t kGameServerUpdateSlot = 0x2C / sizeof(void*);
