@@ -69,8 +69,11 @@ namespace openfeslhook::net
 	[[nodiscard]] std::string describe(const Service& service);
 
 	/// Picks the loopback address that the look-ups of a host are answered with, the same for every spelling of the
-	/// name and in practice different for each host, so that each host's listeners get ports of their own.
+	/// name and in practice different for each host and each copy of the game, so that each host's listeners get ports
+	/// of their own and several copies of the game on one machine, such as dedicated servers beside a client, never
+	/// reach each other's.
 	/// @param host The host name.
+	/// @param process The copy of the game, such as its process id.
 	/// @return An address in 127.0.0.0/8 other than 127.0.0.1, in host byte order.
-	[[nodiscard]] std::uint32_t loopbackAddressFor(std::string_view host);
+	[[nodiscard]] std::uint32_t loopbackAddressFor(std::string_view host, std::uint32_t process);
 }

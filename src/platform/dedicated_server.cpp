@@ -163,6 +163,27 @@ namespace openfeslhook::platform
 			detour<SetForegroundWindowType>(L"user32", "SetForegroundWindow", &setForegroundWindowDetour,
 			                                originalSetForegroundWindow);
 		}
+
+		// The client keeps to one copy of the game through a named mutex and quits when it exists already. The server
+		// builds have no such lock, so a machine runs several servers and a client beside them; the server's mutex is
+		// left unnamed, which no other copy can find.
+		using CreateMutexAType = HANDLE(WINAPI*)(LPSECURITY_ATTRIBUTES, BOOL, LPCSTR);
+		CreateMutexAType originalCreateMutexA = nullptr;
+
+		HANDLE WINAPI createMutexADetour(const LPSECURITY_ATTRIBUTES attributes, const BOOL owned, const LPCSTR name)
+		{
+			if (name == nullptr || std::strcmp(name, "BFHeroes_Instance_Mutex") != 0)
+				return originalCreateMutexA(attributes, owned, name);
+			const HANDLE mutex = originalCreateMutexA(attributes, owned, nullptr);
+			if (mutex != nullptr)
+				SetLastError(ERROR_SUCCESS); // the game reads the error right after the call
+			return mutex;
+		}
+
+		void allowSeveralServers()
+		{
+			detour<CreateMutexAType>(L"kernel32", "CreateMutexA", &createMutexADetour, originalCreateMutexA);
+		}
 	}
 
 	void enableDedicatedServer() noexcept
@@ -203,6 +224,7 @@ namespace openfeslhook::platform
 			// The renderer DLL is not loaded yet; a detour of the loader patches it the moment the game loads it.
 			detour<LoadLibraryAType>(L"kernel32", "LoadLibraryA", &loadLibraryADetour, originalLoadLibraryA);
 			hideWindows();
+			allowSeveralServers();
 			messages.push_back(startServerManager(image));
 
 			const auto base = reinterpret_cast<std::uintptr_t>(image.base);

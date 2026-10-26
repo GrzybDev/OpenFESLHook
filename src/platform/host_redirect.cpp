@@ -83,7 +83,7 @@ namespace openfeslhook::platform
 
 				if (const std::optional<net::Protocol> protocol = gRedirect->hosts.find(name))
 				{
-					const std::uint32_t address = net::loopbackAddressFor(name);
+					const std::uint32_t address = net::loopbackAddressFor(name, GetCurrentProcessId());
 					{
 						const std::scoped_lock lock(gRedirect->mutex);
 						gRedirect->addresses.insert_or_assign(address, Redirected{.host = name, .protocol = *protocol});

@@ -160,7 +160,7 @@ namespace openfeslhook::test
 		// The host's own loopback address lets the hook take the emulator's port, and a target without a port
 		// stands for the game's.
 		const std::string host = "game-pc.theater.example.test";
-		const boost::asio::ip::address_v4 address(net::loopbackAddressFor(host));
+		const boost::asio::ip::address_v4 address(net::loopbackAddressFor(host, 1));
 		const std::optional<std::uint16_t> port =
 			services.ensure({.protocol = net::Protocol::Theater, .address = address.to_uint(), .port = emulator.port()},
 			                host, net::Target{.host = "127.0.0.1"});
