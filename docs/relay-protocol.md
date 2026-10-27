@@ -1,6 +1,6 @@
 # Relay protocol (openfesl.v1)
 
-The hook carries a game's FESL, Theater and Theater datagram traffic to a relay server over one WebSocket per game process. Each WebSocket message is one frame: a four-byte header that says what happened to which of the game's connections, followed by one whole game packet or a short body. Each connection names the host the game looked up, so one relay server can serve every FESL game without knowing anything about sockets on the player's PC.
+The hook carries a game's FESL, Theater and Theater datagram traffic to a relay server over one WebSocket per game process. Each WebSocket message is one frame: a four-byte header that says what happened to which of the game's connections, followed by one whole game packet or a short body; one more frame type carries what Discord shows for the game. Each connection names the host the game looked up, so one relay server can serve every FESL game without knowing anything about sockets on the player's PC.
 
 ## Connection
 
@@ -24,25 +24,27 @@ All numbers are unsigned and big-endian.
 | 2      | 2    | `connection` | The connection's number, chosen by the hook                            |
 | 4      | n    | `body`       | Depends on `type`                                                      |
 
-The pair (`channel`, `connection`) names one game connection. The hook picks the number when the game connects, never uses 0, and does not reuse a number while that connection is open. Numbers of different channels are independent.
+The pair (`channel`, `connection`) names one game connection. The hook picks the number when the game connects, never uses 0, and does not reuse a number while that connection is open. Numbers of different channels are independent. Channel 0 with connection 0 stands for the session as a whole.
 
 ### Frame types
 
-| Value | Name    | Sent by       | Body                                                       |
-|------:|:--------|:--------------|:-----------------------------------------------------------|
-| 1     | `Open`  | the hook      | u16 port the game connected to, u16 port of the game's socket, u8 length of the host name, the host name in ASCII |
-| 2     | `Data`  | both          | exactly one whole game packet, see [Game packets](#game-packets) |
-| 3     | `Close` | both          | empty                                                      |
+| Value | Name       | Sent by       | Body                                                       |
+|------:|:-----------|:--------------|:-----------------------------------------------------------|
+| 1     | `Open`     | the hook      | u16 port the game connected to, u16 port of the game's socket, u8 length of the host name, the host name in ASCII |
+| 2     | `Data`     | both          | exactly one whole game packet, see [Game packets](#game-packets) |
+| 3     | `Close`    | both          | empty                                                      |
+| 4     | `Presence` | both          | UTF-8 JSON, never empty, see [Presence](#presence); only on channel 0, connection 0 |
 
-- `Open` comes before any `Data` of its connection. The host name is the one the game looked up, such as `bfbc2-pc.fesl.ea.com` or `bfbc2-pc-server.theater.ea.com`, which tells the server the game, whether it is a game or a dedicated server, and the service; it is at most 253 bytes. The first port is the one the game connected to; the game's port is what the game's socket uses on the player's PC, which a server can answer a Theater `ECHO` with.
+- `Open` comes before any `Data` of its connection. The host name is the one the game looked up, such as `bfbc2-pc.fesl.ea.com` or `bfbc2-pc-server.theater.ea.com`, which tells the server the game and the service, and for some games, such as Battlefield: Bad Company 2, whether it is a dedicated server; it is at most 253 bytes. The first port is the one the game connected to; the game's port is what the game's socket uses on the player's PC, which a server can answer a Theater `ECHO` with.
 - `Data` from the server to a connection the hook does not know is dropped.
 - `Close` from the hook means the game closed the connection; from the server it asks the hook to close it, after the packets sent before it have reached the game.
-- A frame with another type or channel, a short header, a `Data` body that is not one whole packet or a `Close` with a body ends the session.
+- A frame with another type or channel, a short header, a `Data` body that is not one whole packet, a `Close` with a body, a `Presence` frame on another channel or connection or with an empty body, or a frame of another type on channel 0 ends the session.
 
 ### Channels
 
 | Value | Name               | The game's connection                                                     |
 |------:|:-------------------|:--------------------------------------------------------------------------|
+| 0     | `Session`          | None: the session as a whole, for `Presence` frames                       |
 | 1     | `Fesl`             | A FESL connection over TCP; the hook terminates its SSLv3                 |
 | 2     | `Theater`          | A Theater connection over TCP                                             |
 | 3     | `TheaterDatagram`  | A game socket that sends UDP datagrams to Theater's port, such as `ECHO`  |
@@ -71,6 +73,51 @@ FESL and Theater share a twelve-byte header, which the hook uses to cut the game
 
 A length below 12 or above 1 MiB breaks the stream's framing; the hook then closes that game connection.
 
+## Presence
+
+The relay server describes what the player is doing, and the hook shows it in the Discord client on the player's PC, adding nothing about the game itself. While `Discord.Enabled` is on, the hook's first frame on every WebSocket, before any `Open`, asks for presence:
+
+```json
+{"enabled":true}
+```
+
+The hook sends no request when presence is off and from a Battlefield Heroes dedicated server, and drops presence on a WebSocket that did not ask for it. A game whose FESL and Theater go to `[Forward]` servers opens no WebSocket and gets none. The server then sends presence whenever it changes, best coalesced into one frame with the latest state:
+
+```json
+{
+  "application": "112233445566778899",
+  "activity": {
+    "name": "Battlefield Heroes",
+    "details": "Team Deathmatch on Village",
+    "state": "A Battlefield Heroes Server",
+    "largeImage": "https://images.example.net/bfheroes.png",
+    "largeText": "Battlefield Heroes",
+    "smallImage": "https://images.example.net/openfesl.png",
+    "smallText": "OpenFESL",
+    "startedAt": 1798761600000,
+    "party": {"size": 3, "max": 16},
+    "page": "/bfheroes"
+  }
+}
+```
+
+| Field | Value | What the hook does |
+|:--|:--|:--|
+| `application` | The Discord application's id, 1 to 20 digits | Required: presence without it, or a body that is not JSON, is dropped with a warning in the log, and the session goes on. Another id makes the hook connect to Discord again with it. An id Discord refuses makes the hook wait 60 seconds before each new attempt, until the server names another. |
+| `activity` | An object, or `null` | `null` or a missing activity clears the presence. |
+| `name` | Text | Shown as "Playing" with the name; cut to 128. Left out when empty, so that Discord shows the application's own name. |
+| `details`, `state` | Text | The two lines below the name; cut to 128, left out when shorter than 2. |
+| `largeImage`, `smallImage` | An image's address or Discord asset key | Left out when empty or longer than 300, since a cut address leads nowhere. |
+| `largeText`, `smallText` | Text | The images' tooltips; cut to 128, left out when shorter than 2. |
+| `startedAt` | Unix time in milliseconds | The start of the elapsed time, when positive. |
+| `party.size`, `party.max` | Numbers | Shown as the party size when `size` is at least 1 and `max` at least `size`; left out otherwise. |
+| `page` | A path, with a query if any, starting with `/` | Where the button opens on the relay server's website; see below. |
+
+- Lengths count UTF-16 code units, as Discord does, and a cut never splits a character. Other fields, and fields of the wrong type, are left out.
+- The hook adds what is the same for every game: the activity type Playing, the name as the status Discord shows in its member list, and one button, OpenFESL, that opens the relay server's website: the host and port of `Server.Url`, over `https://` for `wss://` and `http://` for `ws://`, at `page`, or at `/` when `page` is missing, is not a path or makes an address longer than 512. A server can never point the button at another site.
+- The hook sends Discord at most 5 changes in 20 seconds; when more arrive, it sends only the latest once the wait is over.
+- When the WebSocket closes, the hook clears the presence.
+
 ## HTTP
 
 The game's HTTP requests do not use the WebSocket, whether the game sends them itself or through WinHTTP. The hook sends them to the relay server's host and port, over `https://` when `Server.Url` is `wss://` and `http://` when it is `ws://`, with the method, path, query, body and headers the game sent, the game's `Host` header as `X-OpenFESL-Host` and, while the WebSocket holds one, the relay token as `X-OpenFESL-Relay`. The host header is the hook's own because proxies in front of a server, such as Traefik, drop the `X-Forwarded-*` headers of a peer they do not trust and set `X-Forwarded-Host` to the host they were reached at; a server routes the game's requests by `X-OpenFESL-Host` and its path. The server's status, headers and body go back to the game, redirects and `Set-Cookie` included: the hook follows no redirect and adds no cookie of its own. When the server cannot be reached, the game gets `502 Bad Gateway`.
@@ -90,7 +137,15 @@ The Battlefield Heroes launcher asks the relay server for a session over HTTP, a
 | `account`  | The account name the player entered             |
 | `password` | The password the player entered                 |
 
-A server grants the session with `200` and a JSON body holding `sessionId` and, optionally, `personaName`. The launcher starts the game with `+sessionId`, and a server also with the account, its password and the persona as the server's soldier (the account name when `personaName` is missing). Any other status, or a `200` without `sessionId`, refuses the sign-in; an `error` field names the reason, and the launcher shows its own message for `wrong-sign-in`, `unknown-game`, `disabled`, `banned`, `deactivated` and `no-persona`, and a general one otherwise.
+Started from a website link, `openfesl-bfheroes://launch?role=play&code=<code>`, the launcher signs in with the link's one-time code instead, always to play; it never takes the server from the link.
+
+| Field  | Value                     |
+|:-------|:--------------------------|
+| `game` | `bfheroes`                |
+| `role` | `play`                    |
+| `code` | The link's `code`         |
+
+A server grants the session with `200` and a JSON body holding `sessionId` and, optionally, `personaName`. The launcher starts the game with `+sessionId`, and a server also with the account, its password and the persona as the server's soldier (the account name when `personaName` is missing). Any other status, or a `200` without `sessionId`, refuses the sign-in; an `error` field names the reason, and the launcher shows its own message for `wrong-sign-in`, `unknown-game`, `disabled`, `banned`, `deactivated` and `no-persona`, and a general one otherwise. For a code, `wrong-sign-in` means that it expired or was already used.
 
 ## What the game needs from a server
 

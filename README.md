@@ -25,6 +25,8 @@ The hook's redirection knows no game in particular: it serves every host below t
 | Battlefield: Bad Company 2 | Windows client (Steam, Origin, EA app) and dedicated server | yes   |
 | Battlefield Heroes         | Windows client and dedicated server (game versions 1.46 and 1.89) | yes  |
 
+Battlefield Heroes versions 1.46.222034.0 and 1.89.239937.0 are the only ones tested; other versions are expected to work, but that is not guaranteed. A dedicated server of a version in which the hook does not find the code it patches does not start, and the log names what was missing.
+
 Other FESL games for Windows that meet both conditions may work as they are, or with their hosts in [Configuration](#hosts).
 
 Legal notes
@@ -47,9 +49,12 @@ Features
 - Sends chosen hosts straight to other servers as the game's own packets, over plain TCP or re-encrypted with TLS 1.2 or later
 - Changes none of a client's code, so the client works the same with every release of a game
 - Starts a dedicated server whose own start-up code cannot run without a display (Battlefield Heroes) by patching that code in memory, only when the game is launched as a server
-- Gives Battlefield Heroes' client, run as a dedicated server, the server parts it lacks, as the 1.42 server build has them: it lists the server's game in Theater, accepts players on the server's port, takes them into the game, and pings them and drops the silent ones, so a player who leaves can come back
+- Gives Battlefield Heroes' client, run as a dedicated server, the server parts it lacks: it lists the server's game in Theater, under the same identity after every restart, with the attributes the game's server browser and Play Now filter on, keeps the attributes that change with the players and the map current, accepts players on the server's port, takes them into the game, and pings them and drops the silent ones, so a player who leaves can come back
 - Finds everything it changes in a game's code by signature, string and run-time type, including what moves between a game's releases, so one hook serves each release tried
 - Starts Battlefield Heroes from a launcher window when the game is started without a session, as from the game's own shortcut: signs in at the relay server and starts the game, or a dedicated server to host
+- Starts Battlefield Heroes from the Play links of the relay server's website, once the launcher's option registers them for the copy you choose
+- Shows the launcher and the hook's dialogs in English or Polish, following the Windows display language
+- Shows in the Discord client on the same PC what the player is doing, as the relay server describes it, under the game's own name and with a button to the relay server's website
 - Optional log to a console and to a file, from the hook's start and each game connection down to every packet with its fields and every HTTP request with its headers, tagged and coloured by topic, with passwords, login keys, session tickets, game join keys and host secrets hidden
 
 Build Requirements
@@ -58,10 +63,11 @@ Build Requirements
 - Visual Studio 2026
 
 ### Libraries (installed by vcpkg):
-- Boost.Asio, Boost.Beast, Boost.Log, Boost.PropertyTree, Boost.URL, Boost.Endian and Boost.Algorithm
+- Boost.Asio, Boost.Beast, Boost.Log, Boost.PropertyTree, Boost.URL, Boost.Endian, Boost.Algorithm, Boost.JSON and Boost.Locale
 - OpenSSL 3.6, built with SSLv3 and its weak suites
 - MinHook
 - GoogleTest (unit tests)
+- gettext's `msgfmt` (build tool), which compiles the translation catalogues in `src/locale` that the build embeds in `dinput8.dll`
 
 Compiling
 ---------
@@ -80,7 +86,7 @@ Installing
 1. Copy `dinput8.dll`, either from the latest build in [GitHub Releases](https://github.com/GrzybDev/OpenFESLHook/releases) or from `Release` if you compiled it yourself, next to the game's executable (for Battlefield: Bad Company 2, `BFBC2Game.exe`, or `Frost.Game.Main_Win32_Final.exe` for its dedicated server; for Battlefield Heroes, `BFHeroes.exe`, which is both the client and, with `+dedicated`, the server); the game loads it instead of the system's `dinput8.dll`, to which the hook passes the game's DirectInput calls
 2. Put `OpenFESLHook.ini`, described in [Configuration](#configuration), next to it if you want to change any default
 
-To uninstall, delete `dinput8.dll` and `OpenFESLHook.ini`, and `%LOCALAPPDATA%\OpenFESLHook\bfheroes.ini` if the Battlefield Heroes launcher remembered a choice.
+To uninstall, delete `dinput8.dll` and `OpenFESLHook.ini`, and `%LOCALAPPDATA%\OpenFESLHook\bfheroes.ini` if the Battlefield Heroes launcher remembered a choice. If the launcher's website-link option is ticked, untick it first, or delete the registry key `HKCU\Software\Classes\openfesl-bfheroes`; otherwise the website's Play links still start that copy of the game, now without the hook.
 
 Configuration
 -------------
@@ -92,8 +98,9 @@ A value the file gets wrong keeps its default, a line of `[Hosts]` or `[Forward]
 | Key                          | Description                                                                                                                                         | Allowed values                     | Default                          |
 |-----------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------|:---------------------------------|
 | `Server.Url`                 | The relay server's WebSocket address; HTTP requests go to the same host and port over `http://` for `ws://` and `https://` for `wss://`             | `ws://` or `wss://` address        | `wss://fesl.grzyb.app`           |
-| `Redirect.BlockUnknownHosts` | Make the game's `gethostbyname` look-ups of hosts that `[Hosts]` does not name fail; `getaddrinfo` look-ups of them go to the system's resolver, which is how the hook looks its `[Forward]` servers up | Switch | 1 |
+| `Redirect.BlockUnknownHosts` | Make the game's `gethostbyname` look-ups of hosts that `[Hosts]` does not name fail, other than the PC's own names, which dedicated servers look up for their addresses; `getaddrinfo` look-ups of them go to the system's resolver, which is how the hook looks its `[Forward]` servers up | Switch | 1 |
 | `Forward.VerifyCertificates` | Require `tls://` servers in `[Forward]` to show a certificate from an authority in the Windows certificate store                                    | Switch                             | 1                                |
+| `Discord.Enabled`            | Show the presence the relay server sends for the game in the Discord client on the same PC (see [Discord](#discord))                               | Switch                             | 1                                |
 | `Log.Console`                | Show the log in a console window, or in the game's own console if it has one; in a window the hook opens, Ctrl+C does nothing, but closing it ends the game | Switch                             | 0                                |
 | `Log.File`                   | Save the log to a file, which other programs can read while the game runs                                                                           | Switch                             | 0                                |
 | `Log.Path`                   | The log file, absolute or relative to the folder of `dinput8.dll`; missing folders are created, and a file named here is appended to               | Any path                           | `OpenFESLHook_<date>_<time>.log`, new for each start |
@@ -110,7 +117,7 @@ Console=yes
 ConsoleLevel=debug
 ```
 
-Each log line names its level and its topic: `Hook` (the start, the settings and the log), `DNS` (the game's look-ups and its connections to the hook), `FESL`, `Theater`, `HTTP`, and `Relay` (the WebSocket to the relay server). The console shows each topic in a colour of its own, warnings in yellow, errors in red and the text of debug and trace lines in gray. `info` follows the hook's start, its listeners, the relay server and each game connection; `debug` adds every packet with its fields, every HTTP request and the hook's decisions, such as the ports it listens on; `trace` adds the headers of HTTP requests and responses. Passwords, login keys, session tickets, game join keys and host secrets are hidden at every level.
+Each log line names its level and its topic: `Hook` (the start, the settings and the log), `DNS` (the game's look-ups and its connections to the hook), `FESL`, `Theater`, `HTTP`, `Relay` (the WebSocket to the relay server) and `Discord` (the connection to the Discord client). The console shows each topic in a colour of its own, warnings in yellow, errors in red and the text of debug and trace lines in gray. `info` follows the hook's start, its listeners, the relay server and each game connection; `debug` adds every packet with its fields, every HTTP request and the hook's decisions, such as the ports it listens on; `trace` adds the headers of HTTP requests and responses. Passwords, login keys, session tickets, game join keys and host secrets are hidden at every level.
 
 ### Hosts
 
@@ -150,6 +157,10 @@ When the game starts, the hook:
 5. Opens a WebSocket to the relay server with the game's first FESL or Theater connection, carries every packet in it and closes it with the last connection; when the relay server goes away, the game's connections close and the game connects again
 6. Passes the game's HTTP requests on, opens the pages it hands to the system's browser on the relay server, and passes its DirectInput calls to the system's `dinput8.dll`
 
+### Discord
+
+With `Discord.Enabled` on, the hook asks the relay server for the game's presence on each WebSocket ([Presence](docs/relay-protocol.md#presence)) and shows it in the Discord client running on the same PC: "Playing" with the game's name, what the player is doing, the elapsed time and the players of the server, as the relay server describes them, and a button, OpenFESL, that opens the relay server's website, at the host and port of `Server.Url` over `https://` for `wss://` and `http://` for `ws://`, on the game's page when the server names one. The hook adds nothing about the game itself: a game whose FESL and Theater go to `[Forward]` servers opens no WebSocket and shows nothing, and a Battlefield Heroes dedicated server asks for no presence. The presence is cleared when the WebSocket closes. Without a Discord client the hook tries again with growing pauses, and Discord's own activity privacy settings decide who sees the presence.
+
 ### Battlefield Heroes
 
 Started without `+sessionId`, `BFHeroes.exe` opens the hook's launcher instead of closing:
@@ -158,14 +169,36 @@ Started without `+sessionId`, `BFHeroes.exe` opens the hook's launcher instead o
 3. Choose the game's language (System default follows Windows), and for a server a map from its `maplist.con` (or the server's own map list) and whether it is ranked
 4. The launcher signs in at the relay server ([Launcher sign-in](docs/relay-protocol.md#launcher-sign-in)), starts the game or the server with the session it was given and closes; a refused sign-in shows the server's reason
 
+The launcher's texts follow the Windows display language: Polish for Polish, English for every other language. Game language sets only the game's own language.
+
+Ticking Open Play links from the website with this copy registers the link scheme `openfesl-bfheroes:` for the current Windows user, under `HKCU\Software\Classes\openfesl-bfheroes`; the hook writes there only when you tick or untick the option. A Play link from the relay server's website, `openfesl-bfheroes://launch?role=play&code=<code>`, then starts this copy: the launcher opens, signs in with the link's one-time code at once and starts the game to play, leaving what Remember me keeps as it was. A link to host a server, or one without a code, is refused, and a code that expired or was already used asks for a new link or the account and password. No text of a link reaches the game as its options, and a link never starts a server. One copy holds the links at a time: ticking the option in another copy moves them there, the launcher names the copy that holds them when it is another one that still exists, and unticking removes the registration only while it names this copy. Each game has a scheme of its own, so the hooks of other games never take these links over.
+
 The launcher also starts the game with `+webSiteHostName www.battlefieldheroes.com +battleFundsHostName www.battlefieldheroes.com +survey 0`: without the first two the game opens none of its website's pages, such as the hero creator, and `+survey 1` would open a survey page once the game quits. A game started by hand needs the same options for those pages.
 
-A server, started this way or by hand with `+dedicated 1`, shows only its console. Once it has logged in, it lists its game in Theater as the server builds named theirs, `[data center]name(IP:port)`, from `sv.serverName`, `sv.serverIP` (`(unknown)` when empty), `sv.serverPort` and `sv.maxPlayers`, and accepts players on `sv.serverPort`; with `sv.serverIP` empty, it listens on every network interface. A build in which the hook does not find every part it needs runs on without that part, and the log names what was missing.
+A server, started this way or by hand with `+dedicated 1`, shows only its console. Once it has logged in, it lists its game in Theater under its name, `sv.serverName`, for `sv.maxPlayers` players, and accepts players on `sv.serverPort`; with `sv.serverIP` empty, it listens on every network interface. The server's data center is `sv.prodDataCenter`, or `sv.stestDataCenter` when the server was started with `+plasmaEnvironment test`, as the game's client decides it; an empty one keeps the game's default. The server is ranked only when started with `+ranked`, which the launcher passes when Ranked is ticked: the game reads the option as a switch, whatever its value, and without it the hook sets `sv.ranked` to 0 wherever `ServerSettings.con` or the console sets it. A build in which the hook does not find every part it needs runs on without that part, and the log names what was missing.
+
+Theater gives the server's game an identity, a UGID and a secret, the first time it lists the game. The hook keeps both in `OpenFESLHook_Identity_<port>.ini` next to `dinput8.dll`, one file per `sv.serverPort`, and lists the game under the same identity after every restart, so the relay server's approval of the server still holds. The file holds the server's secret, so keep it private; copy it along when you move the server to another PC, and rename it when you change the server's port. Without the file, or with one the hook cannot read, Theater gives the game a new identity, which replaces the file.
+
+The game's own server code sets the game's version and attributes from its settings, and the hook adds the attributes the game's server browser and Play Now filter on, which Theater lists with the prefix `B-U-`:
+
+| Attribute | Value |
+|:--|:--|
+| `ranked`, `servertype`, `easyzone`, `community_name` | `sv.ranked`, `sv.serverType`, `sv.easyzone` and `sv.serverCommunity` |
+| `data_center` | The data center above |
+| `newbie_server` | `no` |
+| `elo_rank`, `avg_axis_rank`, `avg_ally_rank` | `1000.0000`, `ServerGame.con`'s default Elo rank |
+| `server_state` | `empty`, or `has_players` |
+| `percent_full` | The players as a percentage of `sv.maxPlayers` |
+| `avail_slots_national`, `avail_slots_royal` | `yes` while the army (team 1 national, team 2 royal) has a free seat of its half of `sv.maxPlayers` |
+| `army_balance` | The hook's own reading of `ServerGame.con`'s balance deltas: `Balanced` with even armies, `Axis` (national) or `Allies` (royal) for the army with 1 to 3 players more, `MaxAxis` or `MaxAllies` with 4 or more |
+| `map_name`, `map_gamemode` | The map being played, in lower case, and its game mode, such as `gpm_tdm` |
+
+The attributes from `server_state` on are sent again when they change, at most every 5 seconds. Players join without the server's approval, since the client lacks the code that would answer their requests.
 
 File formats
 ------------
 
-The hook and the relay server talk the WebSocket protocol `openfesl.v1`, which carries the game's packets in frames of a four-byte header; [docs/relay-protocol.md](docs/relay-protocol.md) describes it, the games' packet framing, the HTTP requests and browser pages the hook sends to the server's host, and what a relay server has to do.
+The hook and the relay server talk the WebSocket protocol `openfesl.v1`, which carries the game's packets in frames of a four-byte header; [docs/relay-protocol.md](docs/relay-protocol.md) describes it, the games' packet framing, the presence for Discord, the HTTP requests, browser pages and launcher sign-ins the hook sends to the server's host, and what a relay server has to do.
 
 Credits
 -------
