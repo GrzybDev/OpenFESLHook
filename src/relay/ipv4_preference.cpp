@@ -6,18 +6,8 @@
 
 namespace openfeslhook::relay
 {
-	namespace
-	{
-		bool isAddress(const std::string_view host)
-		{
-			boost::system::error_code error;
-			(void)boost::asio::ip::make_address(host, error);
-			return !error;
-		}
-	}
-
 	Ipv4Preference::Ipv4Preference(const std::string_view host)
-		: host_(util::normalHostName(host)), state_(isAddress(host) ? State::GivenUp : State::Preferred)
+		: host_(util::normalHostName(host)), state_(util::isAddress(host) ? State::GivenUp : State::Preferred)
 	{
 	}
 

@@ -30,6 +30,13 @@ namespace openfeslhook::util
 		return boost::algorithm::to_lower_copy(std::string(name));
 	}
 
+	bool isAddress(const std::string_view text)
+	{
+		boost::system::error_code error;
+		(void)boost::asio::ip::make_address(text, error);
+		return !error;
+	}
+
 	bool isServerHost(const boost::urls::authority_view& authority)
 	{
 		switch (authority.host_type())

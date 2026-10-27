@@ -47,6 +47,9 @@
     <ClCompile Include="dedicated_server_tests.cpp" />
     <ClCompile Include="frame_tests.cpp" />
     <ClCompile Include="game_tls_tests.cpp" />
+    <ClCompile Include="host_redirect_tests.cpp" />
+    <ClCompile Include="..\src\platform\detour.cpp" />
+    <ClCompile Include="..\src\platform\host_redirect.cpp" />
     <ClCompile Include="http_tests.cpp" />
     <ClCompile Include="image_search_tests.cpp" />
     <ClCompile Include="..\src\platform\image_search.cpp" />

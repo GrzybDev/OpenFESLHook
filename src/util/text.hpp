@@ -12,6 +12,10 @@ namespace openfeslhook::util
 	/// @param text The text.
 	[[nodiscard]] bool isHostName(std::string_view text);
 
+	/// Tells whether a text is an IPv4 or IPv6 address rather than a name.
+	/// @param text The text.
+	[[nodiscard]] bool isAddress(std::string_view text);
+
 	/// Writes a host name as DNS compares names: in lowercase and without a final dot.
 	/// @param name The name.
 	[[nodiscard]] std::string normalHostName(std::string_view name);
