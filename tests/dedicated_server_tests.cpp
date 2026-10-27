@@ -160,6 +160,8 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.windowSizeWrites[0]), 0x776C5u);
 			EXPECT_EQ(rva(image, points.windowSizeWrites[1]), 0x776F7u);
 			EXPECT_EQ(rva(image, points.cameraGuard), 0x2E299Du);
+			// The setter, not the command-line parser, which pushes the same setting's name.
+			EXPECT_EQ(rva(image, points.rankedSetter), 0x693B0u);
 			// The resolution routine is reached through the executable's own virtual-function table, so its address is
 			// the one the rebased table holds, i.e. its real virtual address once this image is the loaded module.
 			EXPECT_EQ(rva(image, points.resolutionDefault), 0xD3B5Fu);

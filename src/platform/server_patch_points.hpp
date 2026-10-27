@@ -61,7 +61,12 @@ namespace openfeslhook::platform
 		/// place of reading the client-only VideoSettings resource. Found through the VideoSettings run-time type.
 		const std::uint8_t* resolutionDefault = nullptr;
 
-		/// Whether every point was found, so the patch can be applied whole or not at all.
+		/// The setter of sv.ranked, through which ServerSettings.con and the console set whether the server is ranked.
+		/// The game itself makes it set ranked, whatever value it gets, once started with +ranked. The server starts
+		/// without this point, so complete() leaves it out.
+		const std::uint8_t* rankedSetter = nullptr;
+
+		/// Whether every point the server needs to start was found, so the patch can be applied whole or not at all.
 		[[nodiscard]] bool complete() const noexcept;
 	};
 

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <format>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 
 #include <windows.h>
@@ -187,6 +188,29 @@ namespace openfeslhook::platform
 		{
 			detour<CreateMutexAType>(L"kernel32", "CreateMutexA", &createMutexADetour, originalCreateMutexA);
 		}
+
+		using SetRankedType = void(__thiscall*)(void*, bool);
+		SetRankedType originalSetRanked = nullptr;
+
+		// The game takes +ranked as a switch, whatever its value, so an unranked server is one started without it;
+		// the shipped ServerSettings.con sets sv.ranked 1, which would make that server ranked all the same. Started
+		// with +ranked, the game's setter sets ranked whatever it is given.
+		void __fastcall setRankedDetour(void* settings, void* /*edx*/, bool /*ranked*/)
+		{
+			originalSetRanked(settings, false);
+		}
+
+		std::string followRankedOption(const std::uint8_t* setter, const std::uintptr_t base)
+		{
+			if (setter == nullptr)
+				return "Dedicated server: sv.ranked's setter was not found in this build, so ServerSettings.con "
+				       "decides whether a server started without +ranked is ranked.";
+			installDetourAt(const_cast<std::uint8_t*>(setter), reinterpret_cast<void*>(&setRankedDetour),
+			                reinterpret_cast<void**>(&originalSetRanked));
+			return std::format(
+				"Dedicated server: ranked only when started with +ranked (sv.ranked's setter at +{:#x}).",
+				reinterpret_cast<std::uintptr_t>(setter) - base);
+		}
 	}
 
 	void enableDedicatedServer() noexcept
@@ -227,6 +251,8 @@ namespace openfeslhook::platform
 			detour<LoadLibraryAType>(L"kernel32", "LoadLibraryA", &loadLibraryADetour, originalLoadLibraryA);
 			hideWindows();
 			allowSeveralServers();
+			const auto base = reinterpret_cast<std::uintptr_t>(image.base);
+			messages.push_back(followRankedOption(points.rankedSetter, base));
 			// Every module's points are found before any module replaces a table entry: some look into the same
 			// tables, and a replaced entry no longer leads into the game's code.
 			const ServerManagerPoints hosting = locateServerManagerPoints(image);
@@ -236,7 +262,6 @@ namespace openfeslhook::platform
 			messages.push_back(startNetServer(network));
 			messages.push_back(startPlayerEntry(entry));
 
-			const auto base = reinterpret_cast<std::uintptr_t>(image.base);
 			messages.push_back(std::format(
 				"Dedicated server mode: the client executable was patched headless (content scanner +{:#x}, renderer "
 				"gate +{:#x}, map list +{:#x}, camera guard +{:#x}); the renderer DLL and the game's windows are "

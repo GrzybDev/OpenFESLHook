@@ -184,8 +184,6 @@ namespace openfeslhook::launcher
 				             L"+sessionId",
 				             session,
 				             L"+hostServer",
-				             L"+ranked",
-				             choice.ranked ? L"1" : L"0",
 				             L"+autoLogin",
 				             L"1",
 				             L"+eaAccountName",
@@ -194,6 +192,12 @@ namespace openfeslhook::launcher
 				             platform::widen(choice.password),
 				             L"+soldierName",
 				             soldier};
+				// The game takes +ranked as a switch, whatever its value, so an unranked server is started without it.
+				if (choice.ranked)
+				{
+					arguments.emplace_back(L"+ranked");
+					arguments.emplace_back(L"1");
+				}
 				// A map is optional: with none chosen the server starts on its own map list (maplist.con).
 				if (!choice.map.empty())
 				{

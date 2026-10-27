@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace openfeslhook::platform
@@ -154,6 +155,18 @@ namespace openfeslhook::platform
 		// table of virtual functions.
 		if (const void* const* const videoSettings = findVtable(image, ".?AVVideoSettings@hfe@dice@@"))
 			points.resolutionDefault = static_cast<const std::uint8_t*>(videoSettings[0x3C / sizeof(void*)]);
+
+		// sv.ranked's setter opens its exception frame (push size; mov eax, handler; call), takes its object (mov esi,
+		// ecx) and pushes the name of the GSRanked setting, which +ranked turns on. The command-line parser, which
+		// turns it on, pushes another copy of the name deep inside its own function.
+		constexpr std::string_view kSetterStart = "6A ?? B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F1";
+		constexpr std::size_t kSetterStartLength = 14;
+		for (const std::uint8_t* const name : findStrings(image, "GSRanked"))
+			for (const std::uint8_t* const push : findPushesOf(image, name))
+				if (const std::uint8_t* const setter = push - kSetterStartLength;
+				    within(image, setter, kSetterStartLength) &&
+				    findSignature(setter, kSetterStartLength, kSetterStart) == setter)
+					points.rankedSetter = setter;
 
 		return points;
 	}
