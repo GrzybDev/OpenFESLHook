@@ -29,7 +29,7 @@ namespace openfeslhook::launcher
 			platform::InternetHandle session = platform::openSession(userAgent, platform::SessionMode::Synchronous);
 
 			const platform::InternetHandle connection(
-				WinHttpConnect(session.get(), platform::widen(server.host).c_str(), server.port, 0));
+				WinHttpConnect(session.get(), platform::widen(platform::urlHost(server.host)).c_str(), server.port, 0));
 			if (!connection)
 				throw std::runtime_error(platform::errorText(GetLastError()));
 

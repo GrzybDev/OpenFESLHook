@@ -56,6 +56,8 @@
     <ClCompile Include="..\src\platform\server_manager_points.cpp" />
     <ClCompile Include="..\src\platform\server_patch_points.cpp" />
     <ClCompile Include="ipv4_preference_tests.cpp" />
+    <ClCompile Include="launcher_session_tests.cpp" />
+    <ClCompile Include="..\src\launcher\session.cpp" />
     <ClCompile Include="local_services_tests.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="masking_tests.cpp" />
