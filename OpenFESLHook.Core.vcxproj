@@ -51,6 +51,7 @@
     <ClInclude Include="src\http\masking.hpp" />
     <ClInclude Include="src\http\web_page.hpp" />
     <ClInclude Include="src\i18n\translation.hpp" />
+    <ClInclude Include="src\launcher\launch_link.hpp" />
     <ClInclude Include="src\logging\log.hpp" />
     <ClInclude Include="src\net\datagram_relay.hpp" />
     <ClInclude Include="src\net\direct_route.hpp" />
@@ -81,6 +82,7 @@
     <ClCompile Include="src\http\masking.cpp" />
     <ClCompile Include="src\http\web_page.cpp" />
     <ClCompile Include="src\i18n\translation.cpp" />
+    <ClCompile Include="src\launcher\launch_link.cpp" />
     <ClCompile Include="src\logging\log.cpp" />
     <ClCompile Include="src\net\datagram_relay.cpp" />
     <ClCompile Include="src\net\direct_route.cpp" />

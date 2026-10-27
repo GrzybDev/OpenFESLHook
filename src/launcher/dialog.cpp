@@ -7,6 +7,7 @@
 #include <commctrl.h>
 #include <dwmapi.h>
 
+#include "launcher/website_links.hpp"
 #include "platform/text.hpp"
 #include "platform/translation.hpp"
 #include "resource.h"
@@ -15,8 +16,9 @@ namespace openfeslhook::launcher
 {
 	namespace
 	{
-		// The message the sign-in worker posts back to the dialog; its wParam owns the job it carries.
+		// The messages the workers post back to the dialog; the wParam of each owns the job it carries.
 		constexpr UINT kSignedIn = WM_APP + 1;
+		constexpr UINT kLinksChecked = WM_APP + 2;
 
 		// The game's languages: the `+lang` code the launch passes and the id of the text that names it. The first
 		// stands for the system's language, which is resolved only when the game is launched.
@@ -40,8 +42,11 @@ namespace openfeslhook::launcher
 			const relay::ServerAddress* server = nullptr;
 			const Defaults* defaults = nullptr;
 			const std::vector<std::string>* maps = nullptr;
+			const std::filesystem::path* exe = nullptr;
+			const LaunchLink* link = nullptr;
 			Choice choice;
 			bool busy = false;
+			bool checkingLinks = false;
 		};
 
 		// What the sign-in worker needs and returns, owned by the worker until it posts the window back.
@@ -52,8 +57,45 @@ namespace openfeslhook::launcher
 			bool host = false;
 			std::string account;
 			std::string password;
+			// The code of the website link to sign in with in place of the account and password; empty for those.
+			std::string code;
 			SessionResult result;
 		};
+
+		enum class LinksChange
+		{
+			None,
+			Register,
+			Remove,
+		};
+
+		// What the website-link worker changes and finds, owned by the worker until it posts the window back.
+		struct LinksJob
+		{
+			HWND dialog = nullptr;
+			std::filesystem::path exe;
+			LinksChange change = LinksChange::None;
+			std::wstring name;
+			std::string problem;
+			bool here = false;
+			// The other copy the links start, while it exists.
+			std::optional<std::filesystem::path> elsewhere;
+		};
+
+		// Runs a job on a worker thread and posts it back to its dialog as a message, which then owns it; when the
+		// dialog is gone, the job ends with the worker.
+		template <typename Job, typename Work>
+		void runOnWorker(const UINT message, Job job, Work work)
+		{
+			std::thread(
+				[message, work, job = std::make_unique<Job>(std::move(job))]() mutable
+				{
+					work(*job);
+					if (PostMessageW(job->dialog, message, reinterpret_cast<WPARAM>(job.get()), 0) != FALSE)
+						job.release();
+				})
+				.detach();
+		}
 
 		std::wstring text(const State& state, const std::string_view id)
 		{
@@ -81,8 +123,11 @@ namespace openfeslhook::launcher
 		}
 
 		// The server names why it refused a sign-in by a code, so the text the player reads stays in the catalogues.
-		std::string_view refusalText(const std::string_view refusal)
+		std::string_view refusalText(const std::string_view refusal, const bool viaLink)
 		{
+			// A code that expired or was used already is refused like a wrong password.
+			if (viaLink && refusal == "wrong-sign-in")
+				return "launcher.refusal.link_expired";
 			static constexpr std::pair<std::string_view, std::string_view> texts[] = {
 				{"wrong-sign-in", "launcher.refusal.wrong_sign_in"}, {"unknown-game", "launcher.refusal.unknown_game"},
 				{"disabled", "launcher.refusal.disabled"},           {"banned", "launcher.refusal.banned"},
@@ -103,12 +148,69 @@ namespace openfeslhook::launcher
 				ShowWindow(GetDlgItem(dialog, control), show);
 		}
 
-		void enableControls(const HWND dialog, const bool on)
+		// Cancel is left out: it stays usable during a sign-in, whose answer then goes nowhere. The website-link option
+		// also waits for its own worker.
+		void enableControls(const State& state, const HWND dialog, const bool on)
 		{
-			for (const int control :
-			     {IDOK, IDCANCEL, IDC_MODE_PLAY, IDC_MODE_HOST, IDC_ACCOUNT, IDC_PASSWORD, IDC_REMEMBER, IDC_LANGUAGE,
-			      IDC_MAP, IDC_RANKED})
+			for (const int control : {IDOK, IDC_MODE_PLAY, IDC_MODE_HOST, IDC_ACCOUNT, IDC_PASSWORD, IDC_REMEMBER,
+			                          IDC_LANGUAGE, IDC_MAP, IDC_RANKED})
 				EnableWindow(GetDlgItem(dialog, control), on ? TRUE : FALSE);
+			EnableWindow(GetDlgItem(dialog, IDC_LINKS), on && !state.checkingLinks ? TRUE : FALSE);
+		}
+
+		// Registers or removes the website links as asked, then finds which copy they start, on a worker: the copy
+		// they name may sit on a network share that is slow to answer. The registry is changed only on the player's
+		// tick.
+		void checkLinks(State& state, const HWND dialog, const LinksChange change)
+		{
+			state.checkingLinks = true;
+			EnableWindow(GetDlgItem(dialog, IDC_LINKS), FALSE);
+			runOnWorker(kLinksChecked,
+			            LinksJob{.dialog = dialog,
+			                     .exe = *state.exe,
+			                     .change = change,
+			                     .name = text(state, "launcher.links.name")},
+			            [](LinksJob& job)
+			{
+				try
+				{
+					if (job.change == LinksChange::Register)
+						registerLinks(job.exe, job.name);
+					else if (job.change == LinksChange::Remove)
+						unregisterLinks(job.exe);
+				}
+				catch (const std::exception& problem)
+				{
+					job.problem = problem.what();
+				}
+				const std::optional<std::filesystem::path> linked = linkedCopy();
+				std::error_code error;
+				job.here = linked && std::filesystem::equivalent(*linked, job.exe, error);
+				if (linked && !job.here && std::filesystem::exists(*linked, error))
+					job.elsewhere = linked;
+			});
+		}
+
+		// Ticks the website-link option when the links start this copy, names the copy they start when it is another
+		// one that still exists, and tells how a change went unless a sign-in holds the status line.
+		void showLinks(State& state, const HWND dialog, const LinksJob& job)
+		{
+			state.checkingLinks = false;
+			EnableWindow(GetDlgItem(dialog, IDC_LINKS), state.busy ? FALSE : TRUE);
+			CheckDlgButton(dialog, IDC_LINKS, job.here ? BST_CHECKED : BST_UNCHECKED);
+			const std::string note =
+				job.elsewhere
+					? state.texts->format("launcher.links.elsewhere", {platform::narrow(job.elsewhere->wstring())})
+					: "";
+			SetDlgItemTextW(dialog, IDC_LINKS_NOTE, platform::widen(note).c_str());
+			ShowWindow(GetDlgItem(dialog, IDC_LINKS_NOTE), job.elsewhere ? SW_SHOW : SW_HIDE);
+			if (job.change == LinksChange::None || state.busy)
+				return;
+			const std::wstring status =
+				job.problem.empty()
+					? std::wstring()
+					: text(state, "launcher.status.links_failed") + L"\n" + platform::widen(job.problem);
+			SetDlgItemTextW(dialog, IDC_STATUS, status.c_str());
 		}
 
 		std::string languageCode(const HWND dialog)
@@ -131,9 +233,9 @@ namespace openfeslhook::launcher
 			                                texts.text("launcher.tile.host.description")).c_str());
 			static constexpr std::pair<int, std::string_view> captions[] = {
 				{IDC_ACCOUNT_LABEL, "launcher.field.account"},   {IDC_PASSWORD_LABEL, "launcher.field.password"},
-				{IDC_REMEMBER, "launcher.field.remember"},       {IDC_LANGUAGE_LABEL, "launcher.field.language"},
-				{IDC_MAP_LABEL, "launcher.field.map"},           {IDC_RANKED, "launcher.field.ranked"},
-				{IDCANCEL, "launcher.button.cancel"},
+				{IDC_REMEMBER, "launcher.field.remember"},       {IDC_LINKS, "launcher.field.links"},
+				{IDC_LANGUAGE_LABEL, "launcher.field.language"}, {IDC_MAP_LABEL, "launcher.field.map"},
+				{IDC_RANKED, "launcher.field.ranked"},           {IDCANCEL, "launcher.button.cancel"},
 			};
 			for (const auto& [control, id] : captions)
 				setText(state, dialog, control, id);
@@ -160,12 +262,26 @@ namespace openfeslhook::launcher
 
 			SetDlgItemTextW(dialog, IDC_ACCOUNT, platform::widen(defaults.account).c_str());
 			CheckDlgButton(dialog, IDC_REMEMBER, defaults.remember ? BST_CHECKED : BST_UNCHECKED);
-			CheckRadioButton(dialog, IDC_MODE_PLAY, IDC_MODE_HOST,
-			                 defaults.mode == Mode::Host ? IDC_MODE_HOST : IDC_MODE_PLAY);
+			// A website link only ever signs in to play.
+			const bool host = defaults.mode == Mode::Host && state.link->kind == LinkKind::None;
+			CheckRadioButton(dialog, IDC_MODE_PLAY, IDC_MODE_HOST, host ? IDC_MODE_HOST : IDC_MODE_PLAY);
 			updateMode(state, dialog);
+			checkLinks(state, dialog, LinksChange::None);
 		}
 
-		void startSignIn(State& state, const HWND dialog)
+		void startSignIn(State& state, const HWND dialog, SignInJob request, const std::string_view status)
+		{
+			state.busy = true;
+			enableControls(state, dialog, false);
+			setText(state, dialog, IDC_STATUS, status);
+			runOnWorker(kSignedIn, std::move(request), [](SignInJob& job)
+			{
+				job.result = job.code.empty() ? requestSession(job.server, job.host, job.account, job.password)
+				                              : requestLinkSession(job.server, job.code);
+			});
+		}
+
+		void signInWithPassword(State& state, const HWND dialog)
 		{
 			if (state.busy)
 				return;
@@ -177,34 +293,35 @@ namespace openfeslhook::launcher
 				MessageBeep(MB_ICONWARNING);
 				return;
 			}
+			startSignIn(state, dialog,
+			            {.dialog = dialog,
+			             .server = *state.server,
+			             .host = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED,
+			             .account = platform::narrow(account),
+			             .password = platform::narrow(password)},
+			            "launcher.status.signing_in");
+		}
 
-			state.busy = true;
-			enableControls(dialog, false);
-			setText(state, dialog, IDC_STATUS, "launcher.status.signing_in");
-
-			auto* const job = new SignInJob{.dialog = dialog,
-			                                .server = *state.server,
-			                                .host = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED,
-			                                .account = platform::narrow(account),
-			                                .password = platform::narrow(password)};
-			std::thread(
-				[job]
-				{
-					job->result = requestSession(job->server, job->host, job->account, job->password);
-					PostMessageW(job->dialog, kSignedIn, reinterpret_cast<WPARAM>(job), 0);
-				})
-				.detach();
+		// Signs in with the website link the launcher was started with, or says why this copy cannot use it.
+		void signInWithLink(State& state, const HWND dialog)
+		{
+			if (state.link->kind == LinkKind::Unusable)
+				setText(state, dialog, IDC_STATUS, "launcher.status.link_unusable");
+			else if (state.link->kind == LinkKind::Play)
+				startSignIn(state, dialog, {.dialog = dialog, .server = *state.server, .code = state.link->code},
+				            "launcher.status.signing_in_link");
 		}
 
 		void finishSignIn(State& state, const HWND dialog, SignInJob& job)
 		{
 			state.busy = false;
+			const bool viaLink = !job.code.empty();
 			if (!job.result.session)
 			{
-				enableControls(dialog, true);
+				enableControls(state, dialog, true);
 				updateMode(state, dialog); // the map controls follow the mode again
 				if (job.result.problem.empty())
-					setText(state, dialog, IDC_STATUS, refusalText(job.result.refusal));
+					setText(state, dialog, IDC_STATUS, refusalText(job.result.refusal, viaLink));
 				else
 				{
 					const std::string_view lead =
@@ -216,7 +333,9 @@ namespace openfeslhook::launcher
 			}
 
 			Choice& choice = state.choice;
-			choice.mode = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED ? Mode::Host : Mode::Play;
+			choice.viaLink = viaLink;
+			const bool host = !viaLink && IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED;
+			choice.mode = host ? Mode::Host : Mode::Play;
 			choice.session = *job.result.session;
 			choice.account = job.account;
 			choice.password = job.password;
@@ -265,6 +384,7 @@ namespace openfeslhook::launcher
 				applyModernFrame(dialog);
 				prefill(*initial, dialog);
 				SetFocus(GetDlgItem(dialog, initial->defaults->account.empty() ? IDC_ACCOUNT : IDC_PASSWORD));
+				signInWithLink(*initial, dialog);
 				return FALSE; // the focus was set here
 			}
 			case WM_COMMAND:
@@ -275,26 +395,33 @@ namespace openfeslhook::launcher
 					if (HIWORD(wParam) == BN_CLICKED)
 						updateMode(*state, dialog);
 					return TRUE;
+				case IDC_LINKS:
+					if (HIWORD(wParam) == BN_CLICKED)
+						checkLinks(*state, dialog,
+						           IsDlgButtonChecked(dialog, IDC_LINKS) == BST_CHECKED ? LinksChange::Register
+						                                                                : LinksChange::Remove);
+					return TRUE;
 				case IDOK:
-					startSignIn(*state, dialog);
+					signInWithPassword(*state, dialog);
 					return TRUE;
 				case IDCANCEL:
-					if (!state->busy)
-						EndDialog(dialog, IDCANCEL);
+					EndDialog(dialog, IDCANCEL);
 					return TRUE;
 				default:
 					return FALSE;
 				}
 			case kSignedIn:
 			{
-				std::unique_ptr<SignInJob> job(reinterpret_cast<SignInJob*>(wParam));
+				const std::unique_ptr<SignInJob> job(reinterpret_cast<SignInJob*>(wParam));
 				finishSignIn(*state, dialog, *job);
 				return TRUE;
 			}
-			case WM_SYSCOMMAND:
-				if ((wParam & 0xFFF0) == SC_CLOSE && state != nullptr && state->busy)
-					return TRUE; // a sign-in is in flight; the window stays until it answers
-				return FALSE;
+			case kLinksChecked:
+			{
+				const std::unique_ptr<LinksJob> job(reinterpret_cast<LinksJob*>(wParam));
+				showLinks(*state, dialog, *job);
+				return TRUE;
+			}
 			default:
 				return FALSE;
 			}
@@ -302,7 +429,8 @@ namespace openfeslhook::launcher
 	}
 
 	std::optional<Choice> showLauncher(const HINSTANCE instance, const relay::ServerAddress& server,
-	                                   const Defaults& defaults, const std::vector<std::string>& maps)
+	                                   const Defaults& defaults, const std::vector<std::string>& maps,
+	                                   const std::filesystem::path& exe, const LaunchLink& link)
 	{
 		// The game's process is not manifested for Common-Controls 6, so without an activation context over the hook's
 		// own manifest the launcher would draw in the classic, unthemed style.
@@ -317,7 +445,8 @@ namespace openfeslhook::launcher
 		InitCommonControlsEx(&classes);
 
 		const i18n::Translation texts = platform::displayTranslation(instance);
-		State state{.texts = &texts, .server = &server, .defaults = &defaults, .maps = &maps};
+		State state{
+			.texts = &texts, .server = &server, .defaults = &defaults, .maps = &maps, .exe = &exe, .link = &link};
 		const INT_PTR result = DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_LAUNCHER), nullptr, dialogProc,
 		                                       reinterpret_cast<LPARAM>(&state));
 

@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <sstream>
+
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 #include "launcher/session.hpp"
 #include "support.hpp"
 
@@ -32,6 +37,32 @@ namespace openfeslhook::test
 		ASSERT_EQ(requests.size(), 1u);
 		EXPECT_EQ(requests[0].target(), "/launcher/session");
 		EXPECT_NE(requests[0].body().find(R"("account":"SampleAccount")"), std::string::npos);
+	}
+
+	TEST(LauncherSession, TradesAWebsiteLinkCodeForASessionToPlay)
+	{
+		const LoopbackHttpServer server(boost::asio::ip::address_v4::loopback(), [](const http::Request&)
+		{
+			http::Response response(boost::beast::http::status::ok, 11);
+			response.body() = R"({"sessionId":"L1nkS3ss10n"})";
+			return response;
+		});
+
+		const launcher::SessionResult result = launcher::requestLinkSession(
+			{.secure = false, .host = "127.0.0.1", .port = server.port()}, "AbC123");
+
+		ASSERT_TRUE(result.session) << result.problem;
+		EXPECT_EQ(result.session->sessionId, "L1nkS3ss10n");
+		const std::vector<http::Request> requests = server.requests();
+		ASSERT_EQ(requests.size(), 1u);
+		boost::property_tree::ptree body;
+		std::istringstream text(requests[0].body());
+		boost::property_tree::read_json(text, body);
+		EXPECT_EQ(body.get<std::string>("game"), "bfheroes");
+		EXPECT_EQ(body.get<std::string>("role"), "play");
+		EXPECT_EQ(body.get<std::string>("code"), "AbC123");
+		EXPECT_FALSE(body.get_optional<std::string>("account"));
+		EXPECT_FALSE(body.get_optional<std::string>("password"));
 	}
 
 	TEST(LauncherSession, ReportsAServerThatCannotBeReached)

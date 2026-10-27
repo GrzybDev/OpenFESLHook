@@ -45,6 +45,15 @@ msgstr "Password"
 msgid "launcher.field.remember"
 msgstr "Remember me"
 
+msgid "launcher.field.links"
+msgstr "Open Play links from the website with this copy"
+
+msgid "launcher.links.elsewhere"
+msgstr "They open {1} now."
+
+msgid "launcher.links.name"
+msgstr "Battlefield Heroes link"
+
 msgid "launcher.field.language"
 msgstr "Game language"
 
@@ -105,6 +114,9 @@ msgstr "Brazilian Portuguese"
 msgid "launcher.status.signing_in"
 msgstr "Signing in..."
 
+msgid "launcher.status.signing_in_link"
+msgstr "Signing in with the website link..."
+
 msgid "launcher.status.need_account"
 msgstr "Enter an account and a password."
 
@@ -114,8 +126,20 @@ msgstr "The server could not be reached."
 msgid "launcher.status.failed"
 msgstr "Sign-in failed."
 
+msgid "launcher.status.link_unusable"
+msgstr ""
+"The link is not for playing Battlefield Heroes, so this copy cannot use it."
+
+msgid "launcher.status.links_failed"
+msgstr "The website links could not be changed."
+
 msgid "launcher.refusal.wrong_sign_in"
 msgstr "The account name or password is wrong."
+
+msgid "launcher.refusal.link_expired"
+msgstr ""
+"The website link has expired or was already used. Open a new one from the "
+"website, or sign in with the account and password."
 
 msgid "launcher.refusal.unknown_game"
 msgstr "The server does not serve Battlefield Heroes."

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <initializer_list>
 #include <locale>
 #include <string>
 #include <string_view>
@@ -23,6 +24,11 @@ namespace openfeslhook::i18n
 		/// The text of an id, or the id itself when the catalogue lacks it.
 		/// @param id The text's id, such as "launcher.tile.play".
 		[[nodiscard]] std::string text(std::string_view id) const;
+
+		/// The text of an id with its placeholders {1}, {2}, ... replaced by the arguments in order.
+		/// @param id The text's id.
+		/// @param arguments The texts that replace the placeholders.
+		[[nodiscard]] std::string format(std::string_view id, std::initializer_list<std::string_view> arguments) const;
 
 	private:
 		std::locale locale_;

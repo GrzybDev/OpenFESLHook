@@ -11,6 +11,7 @@
 
 #include <windows.h>
 
+#include "launcher/launch_link.hpp"
 #include "logging/log.hpp"
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
@@ -193,6 +194,8 @@ namespace openfeslhook::platform
 		const char* const commandLine = GetCommandLineA();
 		if (commandLine == nullptr || std::strstr(commandLine, "+dedicated") == nullptr)
 			return; // not a dedicated server; leave the game untouched
+		if (launcher::hasLaunchLink(commandLine))
+			return; // a website link starts the launcher to play, whatever text the link holds
 
 		const Image image = mainImage();
 		if (image.text == nullptr)

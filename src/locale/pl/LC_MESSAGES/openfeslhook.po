@@ -46,6 +46,15 @@ msgstr "Hasło"
 msgid "launcher.field.remember"
 msgstr "Zapamiętaj mnie"
 
+msgid "launcher.field.links"
+msgstr "Otwieraj linki „Graj” ze strony w tej kopii gry"
+
+msgid "launcher.links.elsewhere"
+msgstr "Teraz otwierają {1}."
+
+msgid "launcher.links.name"
+msgstr "Link Battlefield Heroes"
+
 msgid "launcher.field.language"
 msgstr "Język gry"
 
@@ -106,6 +115,9 @@ msgstr "Portugalski (Brazylia)"
 msgid "launcher.status.signing_in"
 msgstr "Logowanie..."
 
+msgid "launcher.status.signing_in_link"
+msgstr "Logowanie przez link ze strony..."
+
 msgid "launcher.status.need_account"
 msgstr "Wpisz nazwę konta i hasło."
 
@@ -115,8 +127,21 @@ msgstr "Nie udało się połączyć z serwerem."
 msgid "launcher.status.failed"
 msgstr "Logowanie nie powiodło się."
 
+msgid "launcher.status.link_unusable"
+msgstr ""
+"Ten link nie służy do gry w Battlefield Heroes, więc ta kopia gry nie może "
+"go użyć."
+
+msgid "launcher.status.links_failed"
+msgstr "Nie udało się zmienić ustawienia linków ze strony."
+
 msgid "launcher.refusal.wrong_sign_in"
 msgstr "Nazwa konta lub hasło są nieprawidłowe."
+
+msgid "launcher.refusal.link_expired"
+msgstr ""
+"Link ze strony wygasł albo został już użyty. Otwórz nowy na stronie albo "
+"zaloguj się nazwą konta i hasłem."
 
 msgid "launcher.refusal.unknown_game"
 msgstr "Serwer nie obsługuje gry Battlefield Heroes."

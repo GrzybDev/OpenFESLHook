@@ -6,6 +6,7 @@
 
 #include "app/settings.hpp"
 #include "launcher/dialog.hpp"
+#include "launcher/launch_link.hpp"
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
 #include "platform/text.hpp"
@@ -243,7 +244,17 @@ namespace openfeslhook::launcher
 			}
 		}
 
-		void runLauncher()
+		// The website link among the process's arguments; one this copy cannot use when the command line names the
+		// link scheme but no argument reads as a link.
+		LaunchLink linkArgument()
+		{
+			for (const std::wstring& argument : platform::splitCommandLine(GetCommandLineW()) | std::views::drop(1))
+				if (LaunchLink link = parseLaunchLink(platform::narrow(argument)); link.kind != LinkKind::None)
+					return link;
+			return {.kind = LinkKind::Unusable};
+		}
+
+		void runLauncher(const LaunchLink& link)
 		{
 			try
 			{
@@ -252,11 +263,12 @@ namespace openfeslhook::launcher
 				const config::Settings settings = app::loadSettings(folder / L"OpenFESLHook.ini");
 				const std::vector<std::string> maps = loadMaps(folder);
 				const Defaults defaults = loadDefaults();
-				const std::optional<Choice> choice = showLauncher(gSelf, settings.server, defaults, maps);
+				const std::optional<Choice> choice = showLauncher(gSelf, settings.server, defaults, maps, exe, link);
 				if (!choice)
 					return; // the player cancelled, so this process ends without starting the game
 
-				saveDefaults(*choice);
+				if (!choice->viaLink)
+					saveDefaults(*choice);
 				launchGame(exe, buildCommandLine(exe, *choice));
 			}
 			catch (...)
@@ -267,11 +279,14 @@ namespace openfeslhook::launcher
 
 		int __fastcall gateDetour(void* a, void* b, char* commandLine)
 		{
+			// A website link is looked for first, so that no text of it ever reaches the game as its options.
+			if (commandLine != nullptr && hasLaunchLink(commandLine))
+				runLauncher(linkArgument());
 			// A manual start, or the child this launcher starts, carries a session and runs as the game always did.
-			if (commandLine != nullptr && std::strstr(commandLine, "+sessionId") != nullptr)
+			else if (commandLine != nullptr && std::strstr(commandLine, "+sessionId") != nullptr)
 				return originalGate(a, b, commandLine);
-
-			runLauncher();
+			else
+				runLauncher({});
 			return 0x29a; // the gate's own result when it does not start the game; this process now ends
 		}
 	}

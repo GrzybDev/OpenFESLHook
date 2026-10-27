@@ -61,6 +61,7 @@
     <ClInclude Include="src\launcher\dialog.hpp" />
     <ClInclude Include="src\launcher\launcher.hpp" />
     <ClInclude Include="src\launcher\session.hpp" />
+    <ClInclude Include="src\launcher\website_links.hpp" />
     <ClInclude Include="src\platform\browser_attributes.hpp" />
     <ClInclude Include="src\platform\dedicated_server.hpp" />
     <ClInclude Include="src\platform\detour.hpp" />
@@ -95,6 +96,7 @@
     <ClCompile Include="src\launcher\dialog.cpp" />
     <ClCompile Include="src\launcher\launcher.cpp" />
     <ClCompile Include="src\launcher\session.cpp" />
+    <ClCompile Include="src\launcher\website_links.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>

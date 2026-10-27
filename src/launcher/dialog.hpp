@@ -1,11 +1,13 @@
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include <windows.h>
 
+#include "launcher/launch_link.hpp"
 #include "launcher/session.hpp"
 #include "relay/server_address.hpp"
 
@@ -43,14 +45,21 @@ namespace openfeslhook::launcher
 		std::string map;
 		bool ranked = false;
 		bool remember = false;
+		/// Whether the session came from a website link's code, which signs in to play and leaves what the launcher
+		/// remembers as it is.
+		bool viaLink = false;
 	};
 
 	/// Shows the launcher and returns the player's choice once they sign in, or nothing when they cancel. Signs in
-	/// against the relay server on a worker thread, so the window stays responsive while it waits.
+	/// against the relay server and reads or changes the website links on worker threads, so the window stays
+	/// responsive while it waits; started with a website link, it signs in with the link's code at once.
 	/// @param instance The module whose dialog template and catalogues are shown.
 	/// @param server The relay server to sign in against.
 	/// @param defaults The fields to prefill.
 	/// @param maps The maps a hosted server may load.
+	/// @param exe The game's executable, which the website-link option registers.
+	/// @param link The website link the game was started with; of kind None when there is none.
 	[[nodiscard]] std::optional<Choice> showLauncher(HINSTANCE instance, const relay::ServerAddress& server,
-	                                                  const Defaults& defaults, const std::vector<std::string>& maps);
+	                                                  const Defaults& defaults, const std::vector<std::string>& maps,
+	                                                  const std::filesystem::path& exe, const LaunchLink& link);
 }

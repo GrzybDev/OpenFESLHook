@@ -73,57 +73,74 @@ namespace openfeslhook::launcher
 			}
 			return answer;
 		}
+
+		// Sends a launcher request and reads the session or the refusal from the answer; the soldier is the account's
+		// name when the server names none.
+		SessionResult ask(const relay::ServerAddress& server, const pt::ptree& request, const std::string_view account)
+		{
+			SessionResult result;
+			try
+			{
+				std::ostringstream payload;
+				pt::write_json(payload, request, false);
+
+				const Answer answer = post(server, payload.str());
+
+				pt::ptree body;
+				try
+				{
+					std::istringstream text(answer.body);
+					pt::read_json(text, body);
+				}
+				catch (const pt::json_parser_error&)
+				{
+					// A body that is not JSON leaves the fields empty, so the status alone decides the outcome.
+				}
+
+				if (answer.status == 200)
+				{
+					Session session{.sessionId = body.get<std::string>("sessionId", ""),
+					                .soldierName = body.get<std::string>("personaName", std::string(account))};
+					if (session.sessionId.empty())
+						result.refusal = body.get<std::string>("error", "");
+					else
+						result.session = std::move(session);
+				}
+				else
+					result.refusal = body.get<std::string>("error", "");
+			}
+			catch (const WinHttpFailure& problem)
+			{
+				result.problem = problem.what();
+				result.unreachable = problem.code == ERROR_WINHTTP_CANNOT_CONNECT ||
+				                     problem.code == ERROR_WINHTTP_NAME_NOT_RESOLVED ||
+				                     problem.code == ERROR_WINHTTP_TIMEOUT;
+			}
+			catch (const std::exception& problem)
+			{
+				result.problem = problem.what();
+			}
+			return result;
+		}
 	}
 
 	SessionResult requestSession(const relay::ServerAddress& server, const bool host, const std::string_view account,
 	                             const std::string_view password)
 	{
-		SessionResult result;
-		try
-		{
-			pt::ptree request;
-			request.put("game", "bfheroes");
-			request.put("role", host ? "host" : "play");
-			request.put("account", std::string(account));
-			request.put("password", std::string(password));
-			std::ostringstream payload;
-			pt::write_json(payload, request, false);
+		pt::ptree request;
+		request.put("game", "bfheroes");
+		request.put("role", host ? "host" : "play");
+		request.put("account", std::string(account));
+		request.put("password", std::string(password));
+		return ask(server, request, account);
+	}
 
-			const Answer answer = post(server, payload.str());
-
-			pt::ptree body;
-			try
-			{
-				std::istringstream text(answer.body);
-				pt::read_json(text, body);
-			}
-			catch (const pt::json_parser_error&)
-			{
-				// A body that is not JSON leaves the fields empty, so the status alone decides the outcome.
-			}
-
-			if (answer.status == 200)
-			{
-				Session session{.sessionId = body.get<std::string>("sessionId", ""),
-				                .soldierName = body.get<std::string>("personaName", std::string(account))};
-				if (session.sessionId.empty())
-					result.refusal = body.get<std::string>("error", "");
-				else
-					result.session = std::move(session);
-			}
-			else
-				result.refusal = body.get<std::string>("error", "");
-		}
-		catch (const WinHttpFailure& problem)
-		{
-			result.problem = problem.what();
-			result.unreachable = problem.code == ERROR_WINHTTP_CANNOT_CONNECT ||
-			                     problem.code == ERROR_WINHTTP_NAME_NOT_RESOLVED || problem.code == ERROR_WINHTTP_TIMEOUT;
-		}
-		catch (const std::exception& problem)
-		{
-			result.problem = problem.what();
-		}
-		return result;
+	SessionResult requestLinkSession(const relay::ServerAddress& server, const std::string_view code)
+	{
+		pt::ptree request;
+		request.put("game", "bfheroes");
+		request.put("role", "play");
+		request.put("code", std::string(code));
+		return ask(server, request, {});
 	}
 }

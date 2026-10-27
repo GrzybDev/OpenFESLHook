@@ -49,6 +49,17 @@ namespace openfeslhook::test
 			EXPECT_EQ(embeddedTranslation(displayLanguage).text("launcher.tile.play"), play) << displayLanguage;
 	}
 
+	TEST(Translation, PutsTheArgumentInPlaceOfThePlaceholderInEitherLanguage)
+	{
+		constexpr std::string_view path = R"(D:\Games\Sample Copy\BFHeroes.exe)";
+		for (const std::string_view displayLanguage : {"en-GB", "pl-PL"})
+		{
+			const std::string text = embeddedTranslation(displayLanguage).format("launcher.links.elsewhere", {path});
+			EXPECT_NE(text.find(path), std::string::npos) << text;
+			EXPECT_EQ(text.find("{1}"), std::string::npos) << text;
+		}
+	}
+
 	TEST(Translation, GivesEveryIdOfTheEnglishCatalogueAPolishText)
 	{
 		const std::vector<char> english = platform::embeddedCatalogue(nullptr, "en");

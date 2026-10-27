@@ -36,4 +36,10 @@ namespace openfeslhook::launcher
 	/// @param password The password the player entered.
 	[[nodiscard]] SessionResult requestSession(const relay::ServerAddress& server, bool host,
 	                                            std::string_view account, std::string_view password);
+
+	/// Trades the one-time code of a website link for a session to play, over the relay server's HTTP(S) address.
+	/// Waits for the answer.
+	/// @param server The relay server, whose scheme, host and port the request follows; never one the link names.
+	/// @param code The link's code.
+	[[nodiscard]] SessionResult requestLinkSession(const relay::ServerAddress& server, std::string_view code);
 }

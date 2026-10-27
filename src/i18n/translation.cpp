@@ -2,6 +2,7 @@
 #include "i18n/translation.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
+#include <boost/locale/format.hpp>
 #include <boost/locale/gnu_gettext.hpp>
 #include <boost/locale/message.hpp>
 
@@ -43,5 +44,15 @@ namespace openfeslhook::i18n
 	std::string Translation::text(const std::string_view id) const
 	{
 		return boost::locale::translate(std::string(id)).str(locale_);
+	}
+
+	std::string Translation::format(const std::string_view id,
+	                                const std::initializer_list<std::string_view> arguments) const
+	{
+		boost::locale::format message(text(id));
+		// By reference: the format keeps a pointer to each argument until it writes the text.
+		for (const std::string_view& argument : arguments)
+			message % argument;
+		return message.str(locale_);
 	}
 }
