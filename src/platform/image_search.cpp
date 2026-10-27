@@ -153,7 +153,8 @@ namespace openfeslhook::platform
 			return nullptr;
 		const auto first = static_cast<std::uint8_t>(parsed.bytes[0]);
 		const std::uint8_t* const last = start + size - parsed.length;
-		for (const std::uint8_t* position = start; position <= last; ++position)
+		const std::uint8_t* position = start;
+		while (position <= last)
 		{
 			position = static_cast<const std::uint8_t*>(
 				std::memchr(position, first, static_cast<std::size_t>(last - position) + 1));
@@ -164,6 +165,7 @@ namespace openfeslhook::platform
 				++i;
 			if (i == parsed.length)
 				return position;
+			++position;
 		}
 		return nullptr;
 	}

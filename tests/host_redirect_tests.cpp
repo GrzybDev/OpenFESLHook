@@ -31,7 +31,8 @@ namespace openfeslhook::test
 		Connections& redirectOnce()
 		{
 			static Connections connections;
-			[[maybe_unused]] static const bool installed = []
+			static std::once_flag installed;
+			std::call_once(installed, []
 			{
 				config::HostMap<net::Protocol> hosts;
 				hosts.add("*.redirect.test", net::Protocol::Http);
@@ -41,8 +42,7 @@ namespace openfeslhook::test
 					const std::scoped_lock lock(connections.mutex);
 					connections.made.emplace_back(host, service);
 				});
-				return true;
-			}();
+			});
 			const std::scoped_lock lock(connections.mutex);
 			connections.made.clear();
 			return connections;

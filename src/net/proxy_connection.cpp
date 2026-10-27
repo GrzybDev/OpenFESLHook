@@ -85,7 +85,8 @@ namespace openfeslhook::net
 			}
 
 			/// Serves a request already read from the stream, then reads the next.
-			void serve(http::Request request)
+			/// @param request The request.
+			void serve(http::Request&& request)
 			{
 				handle(std::move(request));
 			}
@@ -124,7 +125,7 @@ namespace openfeslhook::net
 				});
 			}
 
-			void handle(http::Request request)
+			void handle(http::Request&& request)
 			{
 				const unsigned version = request.version();
 				const bool keepAlive = request.keep_alive();

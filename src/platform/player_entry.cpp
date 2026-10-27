@@ -171,8 +171,7 @@ namespace openfeslhook::platform
 			const std::uint32_t reservedTaken = as<CountType>(points.countReservedPlayers)(reserved);
 			if (playerCount < maxPlayers && teamPlayers < teamSeats)
 				return true;
-			if (reservedTaken >= reservedSlots || reservedSlots == 0 ||
-			    !as<IsReservedType>(points.isReserved)(reserved, info + kInfoName))
+			if (reservedTaken >= reservedSlots || !as<IsReservedType>(points.isReserved)(reserved, info + kInfoName))
 			{
 				kick(server, connection, kServerFull);
 				return false;

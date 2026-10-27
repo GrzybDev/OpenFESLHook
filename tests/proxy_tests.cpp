@@ -159,8 +159,10 @@ namespace openfeslhook::test
 		beast::http::read_header(socket, buffer, established);
 		ASSERT_EQ(established.get().result(), beast::http::status::ok);
 
-		// The game turns its own certificate checks off for these requests, so a client that verifies nothing stands in.
+		// The game turns its own certificate checks off for these requests, so a client that verifies nothing stands in;
+		// like the game's WinHTTP, it offers TLS 1.2 or later only.
 		ssl::context client(ssl::context::tls_client);
+		client.set_options(ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
 		client.set_verify_mode(ssl::verify_none);
 		ssl::stream<tcp::socket&> tls(socket, client);
 		tls.handshake(ssl::stream_base::client);
