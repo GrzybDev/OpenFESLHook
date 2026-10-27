@@ -18,7 +18,7 @@ Table of Contents
 Supported games
 ---------------
 
-The hook knows no game in particular: it serves every host below the FESL and Theater domains on the ports each game connects to. A game needs to load `dinput8.dll` from its folder and to look its servers up by those names.
+The hook's redirection knows no game in particular: it serves every host below the FESL and Theater domains on the ports each game connects to, so a game needs only to load `dinput8.dll` from its folder and to look its servers up by those names. Battlefield Heroes also gets parts of its own: its website among the default hosts, the launcher and the dedicated-server parts.
 
 | Game                       | Releases                                                    | Tried |
 |:---------------------------|:------------------------------------------------------------|:-----:|
@@ -37,11 +37,12 @@ Legal notes
 Features
 --------
 
-- Answers the game's look-ups of the FESL, Theater and HTTP hosts with a loopback address of each host's own, and refuses the look-ups of other hosts
+- Answers the game's look-ups of the FESL, Theater and HTTP hosts with a loopback address of each host's own, through `gethostbyname` and, for a game's embedded browser, `getaddrinfo`, and refuses the game's `gethostbyname` look-ups of other hosts
 - Starts a listener on the port the game connects to, so that no game needs ports of its own in the configuration and a game and its dedicated server can run on one PC
 - Completes the game's SSLv3 on its FESL connections with a key and certificate generated on your PC that the game's client accepts; no certificate or key ships with the hook
 - Carries FESL, Theater and Theater's UDP datagrams to a relay server over one WebSocket per game process ([openfesl.v1](docs/relay-protocol.md)), naming the host of each connection, through Windows' own TLS, certificate store and proxy settings
-- Forwards the game's HTTP requests to the relay server's host, adding the host the game asked for as `X-OpenFESL-Host`
+- Forwards the game's HTTP requests to the relay server's host, adding the host the game asked for as `X-OpenFESL-Host` and the relay token the server hands out with its WebSocket as `X-OpenFESL-Relay`, and leaves redirects and cookies to the game
+- Opens the pages a game shows in the system's browser, such as Battlefield Heroes' hero creator and funds page, on the relay server or the host's own server instead of the game's former website
 - Reaches the relay server's host name over IPv4 first, so that the server learns each player's IPv4 address even where the name also has IPv6 addresses; a request that cannot get through over IPv4 is sent again over every address family, and IPv4 is given up once IPv6 got through where IPv4 did not
 - Sends chosen hosts straight to other servers as the game's own packets, over plain TCP or re-encrypted with TLS 1.2 or later
 - Changes none of a client's code, so the client works the same with every release of a game
@@ -49,7 +50,7 @@ Features
 - Gives Battlefield Heroes' client, run as a dedicated server, the server parts it lacks, as the 1.42 server build has them: it lists the server's game in Theater, accepts players on the server's port, takes them into the game, and pings them and drops the silent ones, so a player who leaves can come back
 - Finds everything it changes in a game's code by signature, string and run-time type, including what moves between a game's releases, so one hook serves each release tried
 - Starts Battlefield Heroes from a launcher window when the game is started without a session, as from the game's own shortcut: signs in at the relay server and starts the game, or a dedicated server to host
-- Optional log to a console and to a file, from the hook's start and each game connection down to every packet with its fields and every HTTP request with its headers, tagged and coloured by topic, with passwords, login keys and session tickets hidden
+- Optional log to a console and to a file, from the hook's start and each game connection down to every packet with its fields and every HTTP request with its headers, tagged and coloured by topic, with passwords, login keys, session tickets, game join keys and host secrets hidden
 
 Build Requirements
 ------------------
@@ -79,7 +80,7 @@ Installing
 1. Copy `dinput8.dll`, either from the latest build in [GitHub Releases](https://github.com/GrzybDev/OpenFESLHook/releases) or from `Release` if you compiled it yourself, next to the game's executable (for Battlefield: Bad Company 2, `BFBC2Game.exe`, or `Frost.Game.Main_Win32_Final.exe` for its dedicated server; for Battlefield Heroes, `BFHeroes.exe`, which is both the client and, with `+dedicated`, the server); the game loads it instead of the system's `dinput8.dll`, to which the hook passes the game's DirectInput calls
 2. Put `OpenFESLHook.ini`, described in [Configuration](#configuration), next to it if you want to change any default
 
-To uninstall, delete `dinput8.dll` and `OpenFESLHook.ini`.
+To uninstall, delete `dinput8.dll` and `OpenFESLHook.ini`, and `%LOCALAPPDATA%\OpenFESLHook\bfheroes.ini` if the Battlefield Heroes launcher remembered a choice.
 
 Configuration
 -------------
@@ -91,7 +92,7 @@ A value the file gets wrong keeps its default, a line of `[Hosts]` or `[Forward]
 | Key                          | Description                                                                                                                                         | Allowed values                     | Default                          |
 |-----------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------|:---------------------------------|
 | `Server.Url`                 | The relay server's WebSocket address; HTTP requests go to the same host and port over `http://` for `ws://` and `https://` for `wss://`             | `ws://` or `wss://` address        | `wss://fesl.grzyb.app`           |
-| `Redirect.BlockUnknownHosts` | Make the look-ups of hosts that `[Hosts]` does not name fail                                                                                        | Switch                             | 1                                |
+| `Redirect.BlockUnknownHosts` | Make the game's `gethostbyname` look-ups of hosts that `[Hosts]` does not name fail; `getaddrinfo` look-ups of them go to the system's resolver, which is how the hook looks its `[Forward]` servers up | Switch | 1 |
 | `Forward.VerifyCertificates` | Require `tls://` servers in `[Forward]` to show a certificate from an authority in the Windows certificate store                                    | Switch                             | 1                                |
 | `Log.Console`                | Show the log in a console window, or in the game's own console if it has one; in a window the hook opens, Ctrl+C does nothing, but closing it ends the game | Switch                             | 0                                |
 | `Log.File`                   | Save the log to a file, which other programs can read while the game runs                                                                           | Switch                             | 0                                |
@@ -109,23 +110,24 @@ Console=yes
 ConsoleLevel=debug
 ```
 
-Each log line names its level and its topic: `Hook` (the start, the settings and the log), `DNS` (the game's look-ups and its connections to the hook), `FESL`, `Theater`, `HTTP`, and `Relay` (the WebSocket to the relay server). The console shows each topic in a colour of its own, warnings in yellow, errors in red and the text of debug and trace lines in gray. `info` follows the hook's start, its listeners, the relay server and each game connection; `debug` adds every packet with its fields, every HTTP request and the hook's decisions, such as the ports it listens on; `trace` adds the headers of HTTP requests and responses. Passwords, login keys and session tickets are hidden at every level.
+Each log line names its level and its topic: `Hook` (the start, the settings and the log), `DNS` (the game's look-ups and its connections to the hook), `FESL`, `Theater`, `HTTP`, and `Relay` (the WebSocket to the relay server). The console shows each topic in a colour of its own, warnings in yellow, errors in red and the text of debug and trace lines in gray. `info` follows the hook's start, its listeners, the relay server and each game connection; `debug` adds every packet with its fields, every HTTP request and the hook's decisions, such as the ports it listens on; `trace` adds the headers of HTTP requests and responses. Passwords, login keys, session tickets, game join keys and host secrets are hidden at every level.
 
 ### Hosts
 
 Each line of `[Hosts]` sends a host, or with `*.` every host below a domain, to the hook: `host=protocol`, where the protocol is `fesl` (SSLv3 over TCP), `theater` (TCP, and UDP datagrams on the same port) or `http`. Names ignore case, and a host takes the line that names it most closely. A `[Hosts]` section replaces the default lines as a whole, unless none of its lines can be used:
 
-| Host               | Protocol  |
-|:-------------------|:----------|
-| `*.fesl.ea.com`    | `fesl`    |
-| `*.theater.ea.com` | `theater` |
-| `easo.ea.com`      | `http`    |
+| Host                      | Protocol  |
+|:--------------------------|:----------|
+| `*.fesl.ea.com`           | `fesl`    |
+| `*.theater.ea.com`        | `theater` |
+| `easo.ea.com`             | `http`    |
+| `*.battlefieldheroes.com` | `http`    |
 
-Each FESL game has hosts of its own below the FESL and Theater domains, such as `bfbc2-pc.fesl.ea.com` and `bfbc2-pc-server.fesl.ea.com` for Battlefield: Bad Company 2 and its dedicated server, so the defaults cover them all.
+Each FESL game has hosts of its own below the FESL and Theater domains, such as `bfbc2-pc.fesl.ea.com` and `bfbc2-pc-server.fesl.ea.com` for Battlefield: Bad Company 2 and its dedicated server, so the defaults cover them all. Battlefield Heroes also reaches its website, below `battlefieldheroes.com`, for its account, its store and the pages it opens in the browser.
 
 ### Forward
 
-Each line of `[Forward]` sends the services of a host that `[Hosts]` redirects, or with `*.` those of every such host below a domain, straight to a server instead of the relay server: `host=server`, where the server is `host[:port]` or `tcp://host[:port]` (the game's packets as they are, FESL decrypted) or `tls://host[:port]` (the same inside TLS 1.2 or later, where the server's certificate has to come from an authority in the Windows certificate store and name the server, unless `VerifyCertificates=0` lets any certificate through). Without a port, the server gets the port the game connected to. Theater's datagrams go to the same host and port over UDP, which is never encrypted. An `http` host sends its requests to `http://host:port`, or `https://host:port` for `tls://`.
+Each line of `[Forward]` sends the services of a host that `[Hosts]` redirects, or with `*.` those of every such host below a domain, straight to a server instead of the relay server: `host=server`, where the server is `host[:port]` or `tcp://host[:port]` (the game's packets as they are, FESL decrypted) or `tls://host[:port]` (the same inside TLS 1.2 or later, where the server's certificate has to come from an authority in the Windows certificate store and name the server, unless `VerifyCertificates=0` lets any certificate through). Without a port, the server gets the port the game connected to. Theater's datagrams go to the same host and port over UDP, which is never encrypted. An `http` host sends its requests to `http://host:port`, or `https://host:port` for `tls://`, whether the game sends them itself or through WinHTTP, and the pages the game opens in the browser open at the same path there. A line whose server `[Hosts]` redirects as well is left out, since the hook looks the server up through the same redirect.
 
 ```ini
 [Forward]
@@ -142,11 +144,11 @@ Usage
 
 When the game starts, the hook:
 1. Reads `OpenFESLHook.ini` and opens the log; when no log output is on, it shows the problems it found in a dialog
-2. Answers each look-up of a host from `[Hosts]` with a loopback address of that host's own, and makes the look-ups of other hosts fail
+2. Answers each look-up of a host from `[Hosts]` with a loopback address of that host's own, and makes the game's `gethostbyname` look-ups of other hosts fail
 3. When the game connects to such an address, starts the host's listener on the port the game asked for, if it is not running yet
 4. Completes the SSLv3 handshake of each FESL connection with a certificate it generated that the game's client accepts
 5. Opens a WebSocket to the relay server with the game's first FESL or Theater connection, carries every packet in it and closes it with the last connection; when the relay server goes away, the game's connections close and the game connects again
-6. Passes the game's HTTP requests on and its DirectInput calls to the system's `dinput8.dll`
+6. Passes the game's HTTP requests on, opens the pages it hands to the system's browser on the relay server, and passes its DirectInput calls to the system's `dinput8.dll`
 
 ### Battlefield Heroes
 
@@ -156,12 +158,14 @@ Started without `+sessionId`, `BFHeroes.exe` opens the hook's launcher instead o
 3. Choose the game's language (System default follows Windows), and for a server a map from its `maplist.con` (or the server's own map list) and whether it is ranked
 4. The launcher signs in at the relay server ([Launcher sign-in](docs/relay-protocol.md#launcher-sign-in)), starts the game or the server with the session it was given and closes; a refused sign-in shows the server's reason
 
+The launcher also starts the game with `+webSiteHostName www.battlefieldheroes.com +battleFundsHostName www.battlefieldheroes.com +survey 0`: without the first two the game opens none of its website's pages, such as the hero creator, and `+survey 1` would open a survey page once the game quits. A game started by hand needs the same options for those pages.
+
 A server, started this way or by hand with `+dedicated 1`, shows only its console. Once it has logged in, it lists its game in Theater as the server builds named theirs, `[data center]name(IP:port)`, from `sv.serverName`, `sv.serverIP` (`(unknown)` when empty), `sv.serverPort` and `sv.maxPlayers`, and accepts players on `sv.serverPort`; with `sv.serverIP` empty, it listens on every network interface. A build in which the hook does not find every part it needs runs on without that part, and the log names what was missing.
 
 File formats
 ------------
 
-The hook and the relay server talk the WebSocket protocol `openfesl.v1`, which carries the game's packets in frames of a four-byte header; [docs/relay-protocol.md](docs/relay-protocol.md) describes it, the games' packet framing and what a relay server has to do.
+The hook and the relay server talk the WebSocket protocol `openfesl.v1`, which carries the game's packets in frames of a four-byte header; [docs/relay-protocol.md](docs/relay-protocol.md) describes it, the games' packet framing, the HTTP requests and browser pages the hook sends to the server's host, and what a relay server has to do.
 
 Credits
 -------
