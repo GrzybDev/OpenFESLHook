@@ -110,6 +110,11 @@ namespace openfeslhook::platform
 		if (!request)
 			return fail("WinHTTP could not set up the request");
 
+		// The game follows redirects and keeps its cookies itself; WinHTTP doing it as well would look the game's own
+		// hosts up in public DNS and carry cookies from one game host to another.
+		DWORD features = WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES;
+		WinHttpSetOption(request.get(), WINHTTP_OPTION_DISABLE_FEATURE, &features, sizeof(features));
+
 		if (destination_.secure && !destination_.verifyCertificates)
 		{
 			DWORD ignore = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID |

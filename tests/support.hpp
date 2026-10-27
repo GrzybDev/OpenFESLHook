@@ -1,22 +1,27 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <boost/asio/cancel_after.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/asio/ssl/context.hpp>
 
 #include "fesl/packet.hpp"
+#include "http/forwarder.hpp"
 #include "relay/frame.hpp"
 #include "relay/upstream.hpp"
 
@@ -107,5 +112,40 @@ namespace openfeslhook::test
 		std::shared_ptr<FakeRelayState> state_;
 
 		relay::Upstream::Events events(std::size_t connection) const;
+	};
+
+	/// Stands in for an HTTP server on a loopback address: it answers each request with what a function makes of it,
+	/// records the requests and closes each connection after its answer.
+	class LoopbackHttpServer
+	{
+	public:
+		/// Starts serving on a free port.
+		/// @param address The loopback address to listen on, such as 127.0.0.1 or ::1.
+		/// @param answer Makes the response to a request.
+		LoopbackHttpServer(const boost::asio::ip::address& address,
+		                   std::function<http::Response(const http::Request& request)> answer);
+
+		/// Stops serving.
+		~LoopbackHttpServer();
+
+		LoopbackHttpServer(const LoopbackHttpServer&) = delete;
+		LoopbackHttpServer& operator=(const LoopbackHttpServer&) = delete;
+
+		/// Tells the port the server listens on.
+		[[nodiscard]] std::uint16_t port() const;
+
+		/// Lists the requests the server received, in order.
+		[[nodiscard]] std::vector<http::Request> requests() const;
+
+	private:
+		boost::asio::io_context io_;
+		boost::asio::ip::tcp::acceptor acceptor_;
+		std::function<http::Response(const http::Request& request)> answer_;
+		std::atomic<bool> stopping_ = false;
+		mutable std::mutex mutex_;
+		std::vector<http::Request> requests_;
+		std::jthread thread_;
+
+		void serve();
 	};
 }

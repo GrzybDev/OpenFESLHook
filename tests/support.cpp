@@ -6,6 +6,9 @@
 #include <string>
 #include <thread>
 
+#include <boost/beast/core/flat_buffer.hpp>
+#include <boost/beast/http/read.hpp>
+#include <boost/beast/http/write.hpp>
 #include <boost/endian/conversion.hpp>
 #include <openssl/provider.h>
 #include <openssl/ssl.h>
@@ -208,5 +211,57 @@ namespace openfeslhook::test
 		// Copied out, since the hook's handlers may call back into the connection.
 		const std::scoped_lock lock(state_->mutex);
 		return state_->links.at(connection).events;
+	}
+
+	LoopbackHttpServer::LoopbackHttpServer(const boost::asio::ip::address& address,
+	                                       std::function<http::Response(const http::Request& request)> answer)
+		: acceptor_(io_, {address, 0}), answer_(std::move(answer))
+	{
+		thread_ = std::jthread([this] { serve(); });
+	}
+
+	LoopbackHttpServer::~LoopbackHttpServer()
+	{
+		// A connection of its own ends the accept the thread waits in.
+		stopping_ = true;
+		boost::asio::ip::tcp::socket wake(io_);
+		boost::system::error_code ignored;
+		wake.connect(acceptor_.local_endpoint(), ignored);
+	}
+
+	std::uint16_t LoopbackHttpServer::port() const
+	{
+		return acceptor_.local_endpoint().port();
+	}
+
+	std::vector<http::Request> LoopbackHttpServer::requests() const
+	{
+		const std::scoped_lock lock(mutex_);
+		return requests_;
+	}
+
+	void LoopbackHttpServer::serve()
+	{
+		namespace beast = boost::beast;
+		boost::system::error_code error;
+		while (!stopping_)
+		{
+			boost::asio::ip::tcp::socket socket = acceptor_.accept(error);
+			if (error || stopping_)
+				return;
+			beast::flat_buffer buffer;
+			http::Request request;
+			beast::http::read(socket, buffer, request, error);
+			if (error)
+				continue;
+			{
+				const std::scoped_lock lock(mutex_);
+				requests_.push_back(request);
+			}
+			http::Response response = answer_(request);
+			response.keep_alive(false);
+			response.prepare_payload();
+			beast::http::write(socket, response, error);
+		}
 	}
 }

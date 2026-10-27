@@ -39,6 +39,7 @@
   <ItemDefinitionGroup>
     <Link>
       <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -64,6 +65,10 @@
     <ClCompile Include="service_tests.cpp" />
     <ClCompile Include="session_tests.cpp" />
     <ClCompile Include="support.cpp" />
+    <ClCompile Include="winhttp_forwarder_tests.cpp" />
+    <ClCompile Include="..\src\platform\text.cpp" />
+    <ClCompile Include="..\src\platform\winhttp.cpp" />
+    <ClCompile Include="..\src\platform\winhttp_forwarder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="support.hpp" />
