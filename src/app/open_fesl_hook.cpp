@@ -59,9 +59,11 @@ namespace openfeslhook::app
 				{
 					return std::make_unique<platform::WinHttpLink>(webSockets, server, ipv4);
 				},
-				[session, server, &ipv4](const std::optional<net::Target>& forward)
+				[session, server, &ipv4](const std::optional<net::Target>& forward,
+				                         std::shared_ptr<const relay::RelayToken> relayToken)
 				{
-					return std::make_shared<platform::WinHttpForwarder>(session, http::destinationOf(server, forward), ipv4);
+					return std::make_shared<platform::WinHttpForwarder>(session, http::destinationOf(server, forward), ipv4,
+					                                                    std::move(relayToken));
 				});
 		}
 

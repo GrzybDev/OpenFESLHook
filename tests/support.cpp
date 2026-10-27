@@ -179,9 +179,9 @@ namespace openfeslhook::test
 		return state_->links.at(connection).closed;
 	}
 
-	void FakeRelayServer::accept(const std::size_t connection) const
+	void FakeRelayServer::accept(const std::size_t connection, std::string relayToken) const
 	{
-		events(connection).opened();
+		events(connection).opened(std::move(relayToken));
 	}
 
 	void FakeRelayServer::send(const std::size_t connection, const relay::Frame& frame) const

@@ -40,6 +40,14 @@ namespace openfeslhook::platform
 	/// @param host A host name or address without brackets.
 	[[nodiscard]] std::string urlHost(std::string_view host);
 
+	/// Reads a header of a request's response.
+	/// @param request The request, whose response has arrived.
+	/// @param query What to read, such as WINHTTP_QUERY_RAW_HEADERS_CRLF or WINHTTP_QUERY_CUSTOM.
+	/// @param name The header's name, for WINHTTP_QUERY_CUSTOM.
+	/// @return The header's value, or an empty text when the response has none.
+	[[nodiscard]] std::wstring queryHeader(HINTERNET request, DWORD query,
+	                                       const wchar_t* name = WINHTTP_HEADER_NAME_BY_INDEX);
+
 	/// Describes a Windows or WinHTTP error code.
 	/// @param code The code.
 	[[nodiscard]] std::string errorText(DWORD code);

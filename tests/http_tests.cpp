@@ -83,9 +83,12 @@ namespace openfeslhook::test
 		FakeRelayServer server;
 		const auto forwarder = std::make_shared<RecordingForwarder>();
 		std::vector<std::optional<net::Target>> asked;
-		const net::HttpForwarders forwarders = [&](const std::optional<net::Target>& forward)
+		std::shared_ptr<const relay::RelayToken> token;
+		const net::HttpForwarders forwarders = [&](const std::optional<net::Target>& forward,
+		                                           std::shared_ptr<const relay::RelayToken> relayToken)
 		{
 			asked.push_back(forward);
+			token = std::move(relayToken);
 			return forwarder;
 		};
 		net::LocalServices services(server.factory(), forwarders);
@@ -111,28 +114,34 @@ namespace openfeslhook::test
 		EXPECT_EQ(requests[1].target(), "/fileupload/locker2.jsp?cmd=dir");
 		EXPECT_EQ(requests[0][beast::http::field::host], "easo.example.test");
 		EXPECT_EQ(asked, (std::vector<std::optional<net::Target>>{std::nullopt}));
+		EXPECT_NE(token, nullptr);
 		EXPECT_EQ(server.connections(), 0u);
 	}
 
-	TEST(LocalServices, AsksForAForwarderToTheServerAnHttpPortGoesTo)
+	// The relay token lets its holder act for the relay session, so only the server that issued it gets it.
+	TEST(LocalServices, AsksForAForwarderWithoutTheRelayTokenToTheServerAnHttpPortGoesTo)
 	{
 		FakeRelayServer server;
 		const net::Target emulator{.host = "192.0.2.10", .port = 8080};
 		std::vector<std::optional<net::Target>> asked;
-		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>& forward)
+		bool tokenGiven = false;
+		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>& forward,
+		                                                  const std::shared_ptr<const relay::RelayToken>& relayToken)
 		{
 			asked.push_back(forward);
+			tokenGiven = tokenGiven || relayToken != nullptr;
 			return std::make_shared<RecordingForwarder>();
 		});
 
 		EXPECT_TRUE(services.ensure({.protocol = net::Protocol::Http, .port = 0}, "easo.example.test", emulator));
 		EXPECT_EQ(asked, (std::vector<std::optional<net::Target>>{emulator}));
+		EXPECT_FALSE(tokenGiven);
 	}
 
 	TEST(LocalServices, AnswersWithBadGatewayWhenTheServerSendsNoResponse)
 	{
 		FakeRelayServer server;
-		net::LocalServices services(server.factory(), [](const std::optional<net::Target>&)
+		net::LocalServices services(server.factory(), [](const std::optional<net::Target>&, const auto&)
 		{
 			return std::make_shared<RecordingForwarder>(false);
 		});

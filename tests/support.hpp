@@ -91,7 +91,8 @@ namespace openfeslhook::test
 
 		/// Accepts a connection, which the hook sees as opened.
 		/// @param connection The connection's index.
-		void accept(std::size_t connection) const;
+		/// @param relayToken The relay token the server hands out with it, if any.
+		void accept(std::size_t connection, std::string relayToken = {}) const;
 
 		/// Sends a frame to the hook.
 		/// @param connection The connection's index.

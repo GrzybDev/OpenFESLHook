@@ -38,23 +38,11 @@ namespace openfeslhook::platform
 				return false;
 			}
 		}
-
-		std::wstring queryText(HINTERNET request, const DWORD query)
-		{
-			DWORD bytes = 0;
-			WinHttpQueryHeaders(request, query, WINHTTP_HEADER_NAME_BY_INDEX, WINHTTP_NO_OUTPUT_BUFFER, &bytes,
-			                    WINHTTP_NO_HEADER_INDEX);
-			std::wstring text(bytes / sizeof(wchar_t), L'\0');
-			if (!WinHttpQueryHeaders(request, query, WINHTTP_HEADER_NAME_BY_INDEX, text.data(), &bytes,
-			                         WINHTTP_NO_HEADER_INDEX))
-				return {};
-			text.resize(bytes / sizeof(wchar_t));
-			return text;
-		}
 	}
 
-	WinHttpForwarder::WinHttpForwarder(HINTERNET session, http::Destination destination, relay::Ipv4Preference& ipv4)
-		: session_(session), destination_(std::move(destination)), ipv4_(ipv4)
+	WinHttpForwarder::WinHttpForwarder(HINTERNET session, http::Destination destination, relay::Ipv4Preference& ipv4,
+	                                   std::shared_ptr<const relay::RelayToken> relayToken)
+		: session_(session), destination_(std::move(destination)), ipv4_(ipv4), relayToken_(std::move(relayToken))
 	{
 		if (!destination_.secure)
 			log::debug(log::Topic::Http, "HTTP requests go to http://{}:{}", urlHost(destination_.host),
@@ -130,6 +118,11 @@ namespace openfeslhook::platform
 		}
 		if (const auto host = game.find(beast::http::field::host); host != game.end())
 			headers += std::format(L"X-OpenFESL-Host: {}\r\n", widen(host->value()));
+		if (relayToken_)
+		{
+			if (const std::shared_ptr<const std::string> token = relayToken_->load())
+				headers += std::format(L"X-OpenFESL-Relay: {}\r\n", widen(*token));
+		}
 
 		const std::string& body = game.body();
 		const auto sendRequest = [&]
@@ -161,7 +154,7 @@ namespace openfeslhook::platform
 		if (!WinHttpReceiveResponse(request.get(), nullptr))
 			return fail("the server could not be reached");
 
-		const std::string head = narrow(queryText(request.get(), WINHTTP_QUERY_RAW_HEADERS_CRLF));
+		const std::string head = narrow(queryHeader(request.get(), WINHTTP_QUERY_RAW_HEADERS_CRLF));
 		beast::http::response_parser<beast::http::empty_body> parser;
 		parser.header_limit(kMaxHeadSize);
 		// The body is read below, which keeps it within kMaxBodySize.

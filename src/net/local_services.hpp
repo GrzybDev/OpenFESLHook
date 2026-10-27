@@ -20,9 +20,10 @@
 
 namespace openfeslhook::net
 {
-	/// Makes the forwarder of an HTTP listener: to the relay server's host, or to the server the listener goes straight
-	/// to, whose port is already filled in.
-	using HttpForwarders = std::function<std::shared_ptr<http::Forwarder>(const std::optional<Target>& forward)>;
+	/// Makes the forwarder of an HTTP listener: to the relay server's host, given the relay session's token for its
+	/// requests, or to the server the listener goes straight to, whose port is already filled in, given none.
+	using HttpForwarders = std::function<std::shared_ptr<http::Forwarder>(
+		const std::optional<Target>& forward, std::shared_ptr<const relay::RelayToken> relayToken)>;
 
 	/// Tells which server a host's HTTP requests go straight to, if any, where port 0 stands for the port the game asked
 	/// for.

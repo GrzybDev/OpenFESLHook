@@ -282,13 +282,11 @@ namespace openfeslhook::platform
 			DWORD size = sizeof(status);
 			WinHttpQueryHeaders(response, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
 			                    WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX);
-			std::wstring protocol(64, L'\0');
-			DWORD bytes = static_cast<DWORD>(protocol.size() * sizeof(wchar_t));
-			const bool answered = WinHttpQueryHeaders(response, WINHTTP_QUERY_CUSTOM, L"Sec-WebSocket-Protocol",
-			                                          protocol.data(), &bytes, WINHTTP_NO_HEADER_INDEX);
-			protocol.resize(answered ? bytes / sizeof(wchar_t) : 0);
-			log::debug(log::Topic::Relay, "The relay server answered with HTTP {} and the subprotocol \"{}\"", status,
-			           narrow(protocol));
+			const std::wstring protocol = queryHeader(response, WINHTTP_QUERY_CUSTOM, L"Sec-WebSocket-Protocol");
+			// Read before the upgrade completes, which ends the request whose response carries it.
+			std::string relayToken = narrow(queryHeader(response, WINHTTP_QUERY_CUSTOM, L"X-OpenFESL-Relay-Token"));
+			log::debug(log::Topic::Relay, "The relay server answered with HTTP {} and the subprotocol \"{}\"{}", status,
+			           narrow(protocol), relayToken.empty() ? "" : ", handing out a relay token");
 
 			HINTERNET upgraded = nullptr;
 			DWORD error = NO_ERROR;
@@ -319,7 +317,7 @@ namespace openfeslhook::platform
 				WinHttpCloseHandle(finished);
 
 			if (!isOver())
-				events.opened();
+				events.opened(std::move(relayToken));
 			receiveNext();
 			sendNext();
 		}

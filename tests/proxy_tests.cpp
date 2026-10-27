@@ -82,7 +82,8 @@ namespace openfeslhook::test
 	{
 		FakeRelayServer server;
 		const auto forwarder = std::make_shared<RecordingForwarder>();
-		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>&) { return forwarder; });
+		net::LocalServices services(server.factory(),
+		                            [&](const std::optional<net::Target>&, const auto&) { return forwarder; });
 		const std::uint16_t port = startProxyWith(services);
 
 		// A plain HTTP proxy request names the host in the target itself, in absolute form.
@@ -101,9 +102,12 @@ namespace openfeslhook::test
 		const auto relay = std::make_shared<RecordingForwarder>();
 		const auto emulator = std::make_shared<RecordingForwarder>();
 		std::vector<std::optional<net::Target>> asked;
-		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>& forward)
+		std::vector<bool> tokens;
+		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>& forward,
+		                                                  const std::shared_ptr<const relay::RelayToken>& relayToken)
 		{
 			asked.push_back(forward);
+			tokens.push_back(relayToken != nullptr);
 			return forward ? emulator : relay;
 		});
 		const std::uint16_t port = startProxyWith(services, [](const std::string_view host)
@@ -124,6 +128,8 @@ namespace openfeslhook::test
 		EXPECT_EQ(asked, (std::vector<std::optional<net::Target>>{
 			                 std::nullopt, net::Target{.host = "emulator.example.test", .port = 8080},
 			                 net::Target{.host = "emulator.example.test", .port = 80}}));
+		// The relay token lets its holder act for the relay session, so only the server that issued it gets it.
+		EXPECT_EQ(tokens, (std::vector<bool>{true, false, false}));
 		ASSERT_EQ(emulator->requests().size(), 2u);
 		EXPECT_EQ(emulator->requests()[0].target(), "/nucleus/authToken");
 		ASSERT_EQ(relay->requests().size(), 1u);
@@ -134,7 +140,8 @@ namespace openfeslhook::test
 	{
 		FakeRelayServer server;
 		const auto forwarder = std::make_shared<RecordingForwarder>();
-		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>&) { return forwarder; });
+		net::LocalServices services(server.factory(),
+		                            [&](const std::optional<net::Target>&, const auto&) { return forwarder; });
 		const std::uint16_t port = startProxyWith(services);
 
 		boost::asio::io_context io;

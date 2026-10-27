@@ -25,13 +25,18 @@ namespace openfeslhook::test
 			});
 			return answer.get_future().get();
 		}
+
+		http::Response ok(const http::Request&)
+		{
+			return http::Response(beast::http::status::ok, 11);
+		}
 	}
 
 	TEST(WinHttpForwarder, LeavesRedirectsAndCookiesToTheGame)
 	{
 		LoopbackHttpServer server(boost::asio::ip::address_v4::loopback(), [](const http::Request& request)
 		{
-			http::Response response(beast::http::status::ok, 11);
+			http::Response response = ok(request);
 			if (request.target() == "/redirect")
 			{
 				response.result(beast::http::status::found);
@@ -58,5 +63,26 @@ namespace openfeslhook::test
 		ASSERT_EQ(requests.size(), 2u);
 		EXPECT_EQ(requests[0].count(beast::http::field::cookie), 0u);
 		EXPECT_EQ(requests[1][beast::http::field::cookie], "language=en");
+	}
+
+	TEST(WinHttpForwarder, AddsTheRelayTokenWhileTheRelaySessionHoldsOne)
+	{
+		LoopbackHttpServer server(boost::asio::ip::address_v4::loopback(), ok);
+		const platform::InternetHandle session =
+			platform::openSession(L"OpenFESLHook.Tests", platform::SessionMode::Synchronous);
+		relay::Ipv4Preference ipv4("127.0.0.1");
+		const auto token = std::make_shared<relay::RelayToken>(std::make_shared<const std::string>("Rel4yT0ken"));
+		platform::WinHttpForwarder forwarder(
+			session.get(), {.secure = false, .host = "127.0.0.1", .port = server.port()}, ipv4, token);
+
+		ASSERT_TRUE(forward(forwarder, "/nucleus/wallets"));
+		token->store(nullptr);
+		ASSERT_TRUE(forward(forwarder, "/nucleus/wallets"));
+
+		const std::vector<http::Request> requests = server.requests();
+		ASSERT_EQ(requests.size(), 2u);
+		EXPECT_EQ(requests[0]["X-OpenFESL-Relay"], "Rel4yT0ken");
+		EXPECT_EQ(requests[0]["X-OpenFESL-Host"], "www.example.test");
+		EXPECT_EQ(requests[1].count("X-OpenFESL-Relay"), 0u);
 	}
 }

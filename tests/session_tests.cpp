@@ -37,6 +37,46 @@ namespace openfeslhook::test
 		};
 	}
 
+	TEST(RelaySession, KeepsTheRelayTokenOnlyWhileItsConnectionIsOpen)
+	{
+		Fixture fixture;
+		const std::shared_ptr<const relay::RelayToken> token = fixture.session->relayToken();
+		const auto held = [&]
+		{
+			const std::shared_ptr<const std::string> value = token->load();
+			return value ? *value : std::string();
+		};
+		// An io_context that ran out of work stops, so each step restarts it.
+		const auto settle = [&]
+		{
+			fixture.io.restart();
+			fixture.io.poll();
+		};
+		const auto game = std::make_shared<RecordingEndpoint>();
+		const relay::OpenBody ports{.listenPort = 18390, .gamePort = 50001};
+
+		std::optional<std::uint16_t> connection = fixture.session->attach(relay::Channel::Fesl, ports, game);
+		ASSERT_TRUE(connection);
+		fixture.server.accept(0, "S3ssionA");
+		settle();
+		EXPECT_EQ(held(), "S3ssionA");
+
+		fixture.session->detach(relay::Channel::Fesl, *connection);
+		fixture.server.accept(0, "Stale42");
+		settle();
+		EXPECT_EQ(held(), "");
+
+		connection = fixture.session->attach(relay::Channel::Fesl, ports, game);
+		ASSERT_TRUE(connection);
+		fixture.server.accept(1, "S3ssionB");
+		settle();
+		EXPECT_EQ(held(), "S3ssionB");
+
+		fixture.server.drop(1, "the server restarted");
+		settle();
+		EXPECT_EQ(held(), "");
+	}
+
 	TEST(RelaySession, CarriesAGameConnectionThroughTheRelayServer)
 	{
 		Fixture fixture;

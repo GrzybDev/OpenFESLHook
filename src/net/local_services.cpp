@@ -44,7 +44,7 @@ namespace openfeslhook::net
 
 		try
 		{
-			std::shared_ptr<http::Forwarder> relay = http_ ? http_(std::nullopt) : nullptr;
+			std::shared_ptr<http::Forwarder> relay = http_ ? http_(std::nullopt, session_->relayToken()) : nullptr;
 			if (!relay)
 				throw std::runtime_error("nothing can forward HTTP requests");
 
@@ -59,7 +59,7 @@ namespace openfeslhook::net
 				if (const auto found = proxyForwarders_.find(*forward); found != proxyForwarders_.end())
 					return found->second;
 				// Kept only once it is made, so that a forwarder that cannot start is tried again by the next request.
-				std::shared_ptr<http::Forwarder> forwarder = http_(forward);
+				std::shared_ptr<http::Forwarder> forwarder = http_(forward, nullptr);
 				log::info(log::Topic::Http, "The game's WinHTTP requests to {} go straight to {}:{}", host, forward->host,
 				          forward->port);
 				return proxyForwarders_.emplace(*forward, std::move(forwarder)).first->second;
@@ -186,7 +186,9 @@ namespace openfeslhook::net
 			log::info(log::Topic::Http, "The http service of port {} goes straight to {}:{}", service.port,
 			          forward->host, forward->port);
 
-		std::shared_ptr<http::Forwarder> forwarder = http_ ? http_(forward) : nullptr;
+		// Only the relay server issued the token, so a server of the listener's own never sees it.
+		std::shared_ptr<http::Forwarder> forwarder =
+			http_ ? http_(forward, forward ? nullptr : session_->relayToken()) : nullptr;
 		if (!forwarder)
 			throw std::runtime_error("nothing can forward HTTP requests");
 

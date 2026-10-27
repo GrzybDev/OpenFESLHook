@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -8,6 +9,10 @@
 
 namespace openfeslhook::relay
 {
+	/// The token the relay server hands out with a connection, which the HTTP requests to its host carry while the
+	/// connection is open; empty while none is. It may be read from any thread.
+	using RelayToken = std::atomic<std::shared_ptr<const std::string>>;
+
 	/// A connection to the relay server that carries frames as binary WebSocket messages.
 	class Upstream
 	{
@@ -15,8 +20,8 @@ namespace openfeslhook::relay
 		/// What the connection reports, from any of its threads.
 		struct Events
 		{
-			/// The connection is open.
-			std::function<void()> opened;
+			/// The connection is open, with the relay token the server answered with, or an empty one.
+			std::function<void(std::string relayToken)> opened;
 			/// A whole message arrived.
 			std::function<void(std::vector<std::uint8_t> message)> received;
 			/// The connection failed or ended; nothing follows.

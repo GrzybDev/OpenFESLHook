@@ -36,6 +36,9 @@ namespace openfeslhook::relay
 
 		void detach(Channel channel, std::uint16_t connection) override;
 
+		/// The relay token of the open connection to the relay server, which forwarders on other threads read.
+		[[nodiscard]] std::shared_ptr<const RelayToken> relayToken() const;
+
 	private:
 		struct Key
 		{
@@ -51,6 +54,8 @@ namespace openfeslhook::relay
 		// Tells the events of an upstream that was closed since from those of the current one.
 		std::uint64_t generation_ = 0;
 		bool upstreamOpened_ = false;
+		// Shared, since forwarders that hold it may outlive the session.
+		std::shared_ptr<RelayToken> relayToken_ = std::make_shared<RelayToken>();
 		std::map<Key, std::weak_ptr<Endpoint>> endpoints_;
 		std::size_t streams_ = 0;
 		std::array<std::uint16_t, 3> lastNumbers_{};

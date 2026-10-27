@@ -34,6 +34,17 @@ namespace openfeslhook::platform
 		return host.find(':') == std::string_view::npos ? std::string(host) : std::format("[{}]", host);
 	}
 
+	std::wstring queryHeader(HINTERNET const request, const DWORD query, const wchar_t* const name)
+	{
+		DWORD bytes = 0;
+		WinHttpQueryHeaders(request, query, name, WINHTTP_NO_OUTPUT_BUFFER, &bytes, WINHTTP_NO_HEADER_INDEX);
+		std::wstring text(bytes / sizeof(wchar_t), L'\0');
+		if (!WinHttpQueryHeaders(request, query, name, text.data(), &bytes, WINHTTP_NO_HEADER_INDEX))
+			return {};
+		text.resize(bytes / sizeof(wchar_t));
+		return text;
+	}
+
 	std::string errorText(const DWORD code)
 	{
 		wchar_t* buffer = nullptr;

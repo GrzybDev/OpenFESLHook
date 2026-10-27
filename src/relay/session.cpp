@@ -96,11 +96,13 @@ namespace openfeslhook::relay
 			});
 		};
 		upstream->open({
-			.opened = [handle]
+			.opened = [handle](std::string relayToken)
 			{
-				handle([](Session& self)
+				handle([relayToken = std::move(relayToken)](Session& self) mutable
 				{
 					self.upstreamOpened_ = true;
+					if (!relayToken.empty())
+						self.relayToken_->store(std::make_shared<const std::string>(std::move(relayToken)));
 					log::info(log::Topic::Relay, "Connected to the relay server");
 				});
 			},
@@ -186,10 +188,16 @@ namespace openfeslhook::relay
 		}
 	}
 
+	std::shared_ptr<const RelayToken> Session::relayToken() const
+	{
+		return relayToken_;
+	}
+
 	void Session::end(const std::string_view reason)
 	{
 		log::info(log::Topic::Relay, "The relay session ended: {}", reason);
 		++generation_;
+		relayToken_->store(nullptr);
 		if (upstream_)
 		{
 			upstream_->close();
