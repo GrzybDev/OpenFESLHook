@@ -196,7 +196,11 @@ namespace openfeslhook::launcher
 				if (job.result.problem.empty())
 					setStatus(state, dialog, refusalText(job.result.refusal));
 				else
-					SetDlgItemTextW(dialog, IDC_STATUS, platform::widen(job.result.problem).c_str());
+				{
+					const UINT lead = job.result.unreachable ? IDS_LAUNCHER_NO_SERVER : IDS_LAUNCHER_FAILED;
+					const std::wstring text = loadString(state.instance, lead) + L"\n" + platform::widen(job.result.problem);
+					SetDlgItemTextW(dialog, IDC_STATUS, text.c_str());
+				}
 				return;
 			}
 

@@ -33,4 +33,19 @@ namespace openfeslhook::test
 		EXPECT_EQ(requests[0].target(), "/launcher/session");
 		EXPECT_NE(requests[0].body().find(R"("account":"SampleAccount")"), std::string::npos);
 	}
+
+	TEST(LauncherSession, ReportsAServerThatCannotBeReached)
+	{
+		boost::asio::io_context io;
+		boost::asio::ip::tcp::acceptor closed(io, {boost::asio::ip::address_v4::loopback(), 0});
+		const std::uint16_t port = closed.local_endpoint().port();
+		closed.close();
+
+		const launcher::SessionResult result = launcher::requestSession(
+			{.secure = false, .host = "127.0.0.1", .port = port}, false, "SampleAccount", "sample-password");
+
+		EXPECT_FALSE(result.session);
+		EXPECT_FALSE(result.problem.empty());
+		EXPECT_TRUE(result.unreachable);
+	}
 }

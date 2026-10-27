@@ -23,6 +23,16 @@ namespace openfeslhook::launcher
 			std::string body;
 		};
 
+		// A WinHTTP call that failed, whose code tells a server that could not be reached from other failures.
+		struct WinHttpFailure : std::runtime_error
+		{
+			DWORD code;
+
+			explicit WinHttpFailure(const DWORD error) : std::runtime_error(platform::errorText(error)), code(error)
+			{
+			}
+		};
+
 		Answer post(const relay::ServerAddress& server, const std::string& payload)
 		{
 			const std::wstring userAgent = platform::widen(std::format("OpenFESLHook/{} (Windows)", kVersion));
@@ -31,22 +41,22 @@ namespace openfeslhook::launcher
 			const platform::InternetHandle connection(
 				WinHttpConnect(session.get(), platform::widen(platform::urlHost(server.host)).c_str(), server.port, 0));
 			if (!connection)
-				throw std::runtime_error(platform::errorText(GetLastError()));
+				throw WinHttpFailure(GetLastError());
 
 			const DWORD flags = server.secure ? WINHTTP_FLAG_SECURE : 0u;
 			const platform::InternetHandle request(WinHttpOpenRequest(connection.get(), L"POST", L"/launcher/session",
 			                                                          nullptr, WINHTTP_NO_REFERER,
 			                                                          WINHTTP_DEFAULT_ACCEPT_TYPES, flags));
 			if (!request)
-				throw std::runtime_error(platform::errorText(GetLastError()));
+				throw WinHttpFailure(GetLastError());
 
 			static constexpr wchar_t headers[] = L"Content-Type: application/json\r\n";
 			if (WinHttpSendRequest(request.get(), headers, static_cast<DWORD>(-1),
 			                       const_cast<char*>(payload.data()), static_cast<DWORD>(payload.size()),
 			                       static_cast<DWORD>(payload.size()), 0) == FALSE)
-				throw std::runtime_error(platform::errorText(GetLastError()));
+				throw WinHttpFailure(GetLastError());
 			if (WinHttpReceiveResponse(request.get(), nullptr) == FALSE)
-				throw std::runtime_error(platform::errorText(GetLastError()));
+				throw WinHttpFailure(GetLastError());
 
 			Answer answer;
 			DWORD size = sizeof(answer.status);
@@ -103,6 +113,12 @@ namespace openfeslhook::launcher
 			}
 			else
 				result.refusal = body.get<std::string>("error", "");
+		}
+		catch (const WinHttpFailure& problem)
+		{
+			result.problem = problem.what();
+			result.unreachable = problem.code == ERROR_WINHTTP_CANNOT_CONNECT ||
+			                     problem.code == ERROR_WINHTTP_NAME_NOT_RESOLVED || problem.code == ERROR_WINHTTP_TIMEOUT;
 		}
 		catch (const std::exception& problem)
 		{

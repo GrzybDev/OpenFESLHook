@@ -24,6 +24,8 @@ namespace openfeslhook::launcher
 		std::string refusal;
 		/// Why the server could not be asked, as the system words it; empty when it answered.
 		std::string problem;
+		/// Whether the problem is that the server could not be reached at all.
+		bool unreachable = false;
 	};
 
 	/// Asks the relay server for a session for an account, over the server's HTTP(S) address, so that the game can be
