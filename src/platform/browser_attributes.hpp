@@ -31,7 +31,7 @@ namespace openfeslhook::platform
 		/// The community that runs the server.
 		std::string community;
 
-		/// The data center the server names itself after, such as "iad".
+		/// The data center the server runs in, such as "iad".
 		std::string dataCenter;
 	};
 

@@ -38,7 +38,6 @@ namespace openfeslhook::platform
 		constexpr std::size_t kStestDataCenter = 0xAC; // std::string, the test environment's
 		constexpr std::size_t kServerType = 0xFC;      // std::string
 		constexpr std::size_t kEasyzone = 0x118;
-		constexpr std::size_t kServerIp = 0x12C; // std::string
 		constexpr std::size_t kServerPort = 0x148;
 		constexpr std::size_t kMaxPlayers = 0x160;
 
@@ -205,14 +204,9 @@ namespace openfeslhook::platform
 			if (points.settingsToParams != nullptr)
 				as<MethodType>(points.settingsToParams)(serverGameSettings);
 
-			std::string ip = readGameString(settings + kServerIp);
-			const auto port = read<std::int32_t>(settings + kServerPort);
 			const auto maxPlayers = read<std::int32_t>(settings + kMaxPlayers);
-			// The hook's own name for the game (the builder names it "DefaultGameName"), which the game's server
-			// browser shows.
-			const std::string name = std::format("[{}]{}({}:{})", readGameString(center),
-			                                     readGameString(settings + kServerName), ip.empty() ? "(unknown)" : ip,
-			                                     port);
+			// The builder names every game "DefaultGameName"; the server browser shows the server's own name instead.
+			const std::string name = readGameString(settings + kServerName);
 			const std::size_t copied = std::min(name.size(), kNameCapacity - 1);
 			std::memcpy(params + kName, name.data(), copied);
 			params[kName + copied] = 0;
