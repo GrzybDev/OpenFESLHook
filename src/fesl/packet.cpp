@@ -43,7 +43,8 @@ namespace openfeslhook::fesl
 	bool isSecretField(const std::string_view name)
 	{
 		return boost::algorithm::icontains(name, "password") || boost::algorithm::istarts_with(name, "encrypted") ||
-		       boost::algorithm::iequals(name, "lkey") || boost::algorithm::iequals(name, "ticket");
+		       boost::algorithm::iequals(name, "lkey") || boost::algorithm::iequals(name, "ticket") ||
+		       boost::algorithm::iequals(name, "ekey") || boost::algorithm::iequals(name, "secret");
 	}
 
 	std::optional<Header> readHeader(const std::span<const std::uint8_t> bytes)

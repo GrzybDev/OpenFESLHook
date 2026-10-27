@@ -58,8 +58,8 @@ namespace openfeslhook::fesl
 		boost::beast::flat_buffer buffer_;
 	};
 
-	/// Tells whether a field holds what anyone could sign in with: a password, an encrypted login, a login key or a
-	/// Theater ticket; names ignore case.
+	/// Tells whether a field holds what anyone could sign in or take part in a game with: a password, an encrypted
+	/// login, a login key, or the ticket, join key or host secret Theater hands out; names ignore case.
 	/// @param name The field's name.
 	[[nodiscard]] bool isSecretField(std::string_view name);
 

@@ -57,15 +57,17 @@ namespace openfeslhook::test
 		EXPECT_THROW((void)hugeStream.next(), std::runtime_error);
 	}
 
-	TEST(PacketDescription, HidesWhatSignsIn)
+	TEST(PacketDescription, HidesWhatSignsInOrTakesPartInAGame)
 	{
 		const fesl::Packet login = makePacket("acct", 0xc0000002,
 		                                      "TXN=NuLogin\nnuid=player@example.com\nmacAddr=$0a1b2c3d4e5f\n"
 		                                      "password=hunter2\nencryptedInfo=Ciphered\nlkey=Key123\n"
 		                                      "returnEncryptedInfo=1\n\0"sv);
-		const fesl::Packet join = makePacket("EGEG", 0x00000000, "PL=pc\nTICKET=8301274\nLID=257\nGID=12\n\0"sv);
+		const fesl::Packet join =
+			makePacket("EGEG", 0x00000000, "PL=pc\nTICKET=8301274\nEKEY=Sm9pbktleQ\nLID=257\nGID=12\n\0"sv);
+		const fesl::Packet hosting = makePacket("CGAM", 0x00000000, "LID=257\nGID=12\nSECRET=HostSecret9\n\0"sv);
 
-		const std::string text = fesl::describe(login) + fesl::describe(join);
+		const std::string text = fesl::describe(login) + fesl::describe(join) + fesl::describe(hosting);
 
 		EXPECT_NE(text.find("acct 0xc0000002"), std::string::npos);
 		EXPECT_NE(text.find("nuid=player@example.com"), std::string::npos);
@@ -74,8 +76,10 @@ namespace openfeslhook::test
 		EXPECT_NE(text.find("encryptedInfo=***"), std::string::npos);
 		EXPECT_NE(text.find("lkey=***"), std::string::npos);
 		EXPECT_NE(text.find("TICKET=***"), std::string::npos);
+		EXPECT_NE(text.find("EKEY=***"), std::string::npos);
+		EXPECT_NE(text.find("SECRET=***"), std::string::npos);
 		EXPECT_NE(text.find("returnEncryptedInfo=1"), std::string::npos);
-		for (const std::string_view secret : {"hunter2", "Ciphered", "Key123", "8301274"})
+		for (const std::string_view secret : {"hunter2", "Ciphered", "Key123", "8301274", "Sm9pbktleQ", "HostSecret9"})
 			EXPECT_EQ(text.find(secret), std::string::npos) << secret;
 	}
 }
