@@ -4,9 +4,18 @@
     "boost-asio",
     "boost-beast",
     "boost-endian",
+    "boost-locale",
     "boost-log",
     "boost-property-tree",
     "boost-url",
+    {
+      "$comment": "Only its msgfmt runs, compiling the translation catalogues during the build; none of it ships.",
+      "name": "gettext",
+      "host": true,
+      "features": [
+        "tools"
+      ]
+    },
     "gtest",
     "minhook",
     {

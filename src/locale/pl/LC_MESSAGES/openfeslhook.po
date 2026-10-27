@@ -1,0 +1,134 @@
+# The Polish texts of OpenFESLHook, by id.
+msgid ""
+msgstr ""
+"Project-Id-Version: OpenFESLHook\n"
+"Language: pl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2);\n"
+
+msgid "hook.title"
+msgstr "OpenFESLHook"
+
+msgid "hook.start.problems"
+msgstr ""
+"Podczas uruchamiania OpenFESLHook pojawiły się problemy. Działa dalej tak, "
+"jak opisuje każdy z poniższych wierszy:"
+
+msgid "hook.start.failed"
+msgstr "Nie udało się uruchomić OpenFESLHook, więc gra działa bez niego:"
+
+msgid "hook.start.log_hint"
+msgstr ""
+"Ustawienie Console=1 lub File=1 w sekcji [Log] pliku OpenFESLHook.ini "
+"pokazuje te wiersze w dzienniku OpenFESLHook."
+
+msgid "launcher.tile.play"
+msgstr "Graj"
+
+msgid "launcher.tile.play.description"
+msgstr "Dołącz do gry"
+
+msgid "launcher.tile.host"
+msgstr "Serwer"
+
+msgid "launcher.tile.host.description"
+msgstr "Uruchom własny serwer"
+
+msgid "launcher.field.account"
+msgstr "Konto"
+
+msgid "launcher.field.password"
+msgstr "Hasło"
+
+msgid "launcher.field.remember"
+msgstr "Zapamiętaj mnie"
+
+msgid "launcher.field.language"
+msgstr "Język gry"
+
+msgid "launcher.field.map"
+msgstr "Mapa"
+
+msgid "launcher.field.ranked"
+msgstr "Serwer rankingowy"
+
+msgid "launcher.button.play"
+msgstr "Graj"
+
+msgid "launcher.button.host"
+msgstr "Uruchom"
+
+msgid "launcher.button.cancel"
+msgstr "Anuluj"
+
+msgid "launcher.map.server_list"
+msgstr "Lista map serwera"
+
+msgid "launcher.language.system"
+msgstr "Jak w systemie"
+
+msgid "launcher.language.en"
+msgstr "Angielski"
+
+msgid "launcher.language.de"
+msgstr "Niemiecki"
+
+msgid "launcher.language.fr"
+msgstr "Francuski"
+
+msgid "launcher.language.it"
+msgstr "Włoski"
+
+msgid "launcher.language.pl"
+msgstr "Polski"
+
+msgid "launcher.language.pt"
+msgstr "Portugalski"
+
+msgid "launcher.language.ru"
+msgstr "Rosyjski"
+
+msgid "launcher.language.es"
+msgstr "Hiszpański"
+
+msgid "launcher.language.tr"
+msgstr "Turecki"
+
+msgid "launcher.language.nl"
+msgstr "Niderlandzki"
+
+msgid "launcher.language.br"
+msgstr "Portugalski (Brazylia)"
+
+msgid "launcher.status.signing_in"
+msgstr "Logowanie..."
+
+msgid "launcher.status.need_account"
+msgstr "Wpisz nazwę konta i hasło."
+
+msgid "launcher.status.no_server"
+msgstr "Nie udało się połączyć z serwerem."
+
+msgid "launcher.status.failed"
+msgstr "Logowanie nie powiodło się."
+
+msgid "launcher.refusal.wrong_sign_in"
+msgstr "Nazwa konta lub hasło są nieprawidłowe."
+
+msgid "launcher.refusal.unknown_game"
+msgstr "Serwer nie obsługuje gry Battlefield Heroes."
+
+msgid "launcher.refusal.disabled"
+msgstr "Konto jest wyłączone."
+
+msgid "launcher.refusal.banned"
+msgstr "Konto jest zablokowane."
+
+msgid "launcher.refusal.deactivated"
+msgstr "Konto zostało dezaktywowane."
+
+msgid "launcher.refusal.no_soldier"
+msgstr "Nie udało się utworzyć żołnierza dla tego konta."

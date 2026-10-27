@@ -1,0 +1,133 @@
+# The English base texts of OpenFESLHook, by id.
+msgid ""
+msgstr ""
+"Project-Id-Version: OpenFESLHook\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "hook.title"
+msgstr "OpenFESLHook"
+
+msgid "hook.start.problems"
+msgstr ""
+"OpenFESLHook found problems while starting and runs on as each line "
+"describes:"
+
+msgid "hook.start.failed"
+msgstr "OpenFESLHook could not start, so the game runs without it:"
+
+msgid "hook.start.log_hint"
+msgstr ""
+"Console=1 or File=1 in the [Log] section of OpenFESLHook.ini shows these "
+"lines in the hook's log."
+
+msgid "launcher.tile.play"
+msgstr "Play"
+
+msgid "launcher.tile.play.description"
+msgstr "Join a game"
+
+msgid "launcher.tile.host"
+msgstr "Server"
+
+msgid "launcher.tile.host.description"
+msgstr "Host a server"
+
+msgid "launcher.field.account"
+msgstr "Account"
+
+msgid "launcher.field.password"
+msgstr "Password"
+
+msgid "launcher.field.remember"
+msgstr "Remember me"
+
+msgid "launcher.field.language"
+msgstr "Game language"
+
+msgid "launcher.field.map"
+msgstr "Map"
+
+msgid "launcher.field.ranked"
+msgstr "Ranked"
+
+msgid "launcher.button.play"
+msgstr "Play"
+
+msgid "launcher.button.host"
+msgstr "Host"
+
+msgid "launcher.button.cancel"
+msgstr "Cancel"
+
+msgid "launcher.map.server_list"
+msgstr "Server's map list"
+
+msgid "launcher.language.system"
+msgstr "System default"
+
+msgid "launcher.language.en"
+msgstr "English"
+
+msgid "launcher.language.de"
+msgstr "German"
+
+msgid "launcher.language.fr"
+msgstr "French"
+
+msgid "launcher.language.it"
+msgstr "Italian"
+
+msgid "launcher.language.pl"
+msgstr "Polish"
+
+msgid "launcher.language.pt"
+msgstr "Portuguese"
+
+msgid "launcher.language.ru"
+msgstr "Russian"
+
+msgid "launcher.language.es"
+msgstr "Spanish"
+
+msgid "launcher.language.tr"
+msgstr "Turkish"
+
+msgid "launcher.language.nl"
+msgstr "Dutch"
+
+msgid "launcher.language.br"
+msgstr "Brazilian Portuguese"
+
+msgid "launcher.status.signing_in"
+msgstr "Signing in..."
+
+msgid "launcher.status.need_account"
+msgstr "Enter an account and a password."
+
+msgid "launcher.status.no_server"
+msgstr "The server could not be reached."
+
+msgid "launcher.status.failed"
+msgstr "Sign-in failed."
+
+msgid "launcher.refusal.wrong_sign_in"
+msgstr "The account name or password is wrong."
+
+msgid "launcher.refusal.unknown_game"
+msgstr "The server does not serve Battlefield Heroes."
+
+msgid "launcher.refusal.disabled"
+msgstr "The account is disabled."
+
+msgid "launcher.refusal.banned"
+msgstr "The account is banned."
+
+msgid "launcher.refusal.deactivated"
+msgstr "The account was deactivated."
+
+msgid "launcher.refusal.no_soldier"
+msgstr "No soldier could be made for the account."

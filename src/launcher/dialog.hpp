@@ -47,7 +47,7 @@ namespace openfeslhook::launcher
 
 	/// Shows the launcher and returns the player's choice once they sign in, or nothing when they cancel. Signs in
 	/// against the relay server on a worker thread, so the window stays responsive while it waits.
-	/// @param instance The module whose dialog template and strings are shown.
+	/// @param instance The module whose dialog template and catalogues are shown.
 	/// @param server The relay server to sign in against.
 	/// @param defaults The fields to prefill.
 	/// @param maps The maps a hosted server may load.

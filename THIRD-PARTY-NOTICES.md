@@ -24,15 +24,17 @@ refer to, which does not mean that their owners endorse the hook.
   Copyright (c) 2019 Vinnie Falco (vinnie.falco@gmail.com) and Copyright (c) 2022 Alan de Freitas
   (alandefreitas@gmail.com) (Boost.URL), Copyright Beman Dawes 2010, 2011, 2014, (C) Copyright Darin Adler 2000, (C)
   Copyright Beman Dawes 2006, 2009, 2014 and (C) Copyright Peter Dimov 2019 (Boost.Endian), Copyright Pavol Droba
-  2002-2003 (Boost.Algorithm), and the authors of the Boost libraries they build on
-- Packages: vcpkg boost-algorithm 1.92.0, boost-asio 1.92.0, boost-beast 1.92.0, boost-endian 1.92.0, boost-log 1.92.0,
-  boost-property-tree 1.92.0, boost-url 1.92.0
+  2002-2003 (Boost.Algorithm), Copyright (c) 2009-2011 Artyom Beilis (Tonkikh) and Copyright (c) 2022-2024 Alexander
+  Grund (Boost.Locale), and the authors of the Boost libraries they build on
+- Packages: vcpkg boost-algorithm 1.92.0, boost-asio 1.92.0, boost-beast 1.92.0, boost-endian 1.92.0, boost-locale
+  1.92.0, boost-log 1.92.0, boost-property-tree 1.92.0, boost-url 1.92.0
 - Use: the hook's sockets, their event loop and the thread that forwards HTTP requests (Boost.Asio), reading and writing
   the game's HTTP requests, reading the heads of the forwarded responses and gathering the bytes of game packets
   (Boost.Beast), the log console and log file (Boost.Log), reading OpenFESLHook.ini (Boost.PropertyTree), reading
   server addresses and the queries of request targets (Boost.URL), the big-endian numbers of packets and relay frames
-  (Boost.Endian), comparing names regardless of case (Boost.Algorithm) and the Boost libraries they build on, compiled
-  into dinput8.dll.
+  (Boost.Endian), comparing names regardless of case (Boost.Algorithm), the texts of the launcher and the hook's dialogs
+  in the player's language, read from the translation catalogues embedded in dinput8.dll (Boost.Locale), and the Boost
+  libraries they build on, compiled into dinput8.dll.
 
 ### MinHook
 

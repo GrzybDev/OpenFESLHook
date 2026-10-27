@@ -8,6 +8,7 @@
 #include <dwmapi.h>
 
 #include "platform/text.hpp"
+#include "platform/translation.hpp"
 #include "resource.h"
 
 namespace openfeslhook::launcher
@@ -17,25 +18,25 @@ namespace openfeslhook::launcher
 		// The message the sign-in worker posts back to the dialog; its wParam owns the job it carries.
 		constexpr UINT kSignedIn = WM_APP + 1;
 
-		// The game's languages: the `+lang` code the launch passes and the string that names it. The first stands for
-		// the system's language, which is resolved only when the game is launched.
+		// The game's languages: the `+lang` code the launch passes and the id of the text that names it. The first
+		// stands for the system's language, which is resolved only when the game is launched.
 		struct Language
 		{
-			const char* code;
-			UINT name;
+			std::string_view code;
+			std::string_view name;
 		};
 
 		constexpr Language kLanguages[] = {
-			{"", IDS_LANG_SYSTEM},     {"en", IDS_LANG_ENGLISH},    {"de", IDS_LANG_GERMAN},
-			{"fr", IDS_LANG_FRENCH},   {"it", IDS_LANG_ITALIAN},    {"pl", IDS_LANG_POLISH},
-			{"pt", IDS_LANG_PORTUGUESE}, {"ru", IDS_LANG_RUSSIAN},  {"es", IDS_LANG_SPANISH},
-			{"tr", IDS_LANG_TURKISH},  {"nl", IDS_LANG_DUTCH},      {"br", IDS_LANG_BRAZILIAN},
+			{"", "launcher.language.system"}, {"en", "launcher.language.en"}, {"de", "launcher.language.de"},
+			{"fr", "launcher.language.fr"},   {"it", "launcher.language.it"}, {"pl", "launcher.language.pl"},
+			{"pt", "launcher.language.pt"},   {"ru", "launcher.language.ru"}, {"es", "launcher.language.es"},
+			{"tr", "launcher.language.tr"},   {"nl", "launcher.language.nl"}, {"br", "launcher.language.br"},
 		};
 
 		// The dialog's own state, reached through the window's user data for as long as it is open.
 		struct State
 		{
-			HINSTANCE instance = nullptr;
+			const i18n::Translation* texts = nullptr;
 			const relay::ServerAddress* server = nullptr;
 			const Defaults* defaults = nullptr;
 			const std::vector<std::string>* maps = nullptr;
@@ -54,11 +55,14 @@ namespace openfeslhook::launcher
 			SessionResult result;
 		};
 
-		std::wstring loadString(const HINSTANCE instance, const UINT id)
+		std::wstring text(const State& state, const std::string_view id)
 		{
-			const wchar_t* text = nullptr;
-			const int length = LoadStringW(instance, id, reinterpret_cast<wchar_t*>(&text), 0);
-			return length > 0 ? std::wstring(text, static_cast<std::size_t>(length)) : std::wstring();
+			return platform::widen(state.texts->text(id));
+		}
+
+		void setText(const State& state, const HWND dialog, const int control, const std::string_view id)
+		{
+			SetDlgItemTextW(dialog, control, text(state, id).c_str());
 		}
 
 		std::wstring windowText(const HWND control)
@@ -76,29 +80,24 @@ namespace openfeslhook::launcher
 			SendDlgItemMessageW(dialog, control, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
 		}
 
-		void setStatus(const State& state, const HWND dialog, const UINT id)
+		// The server names why it refused a sign-in by a code, so the text the player reads stays in the catalogues.
+		std::string_view refusalText(const std::string_view refusal)
 		{
-			SetDlgItemTextW(dialog, IDC_STATUS, loadString(state.instance, id).c_str());
-		}
-
-		// The server names why it refused a sign-in by a code, so the text the player reads stays in this string table.
-		UINT refusalText(const std::string_view refusal)
-		{
-			static constexpr std::pair<std::string_view, UINT> texts[] = {
-				{"wrong-sign-in", IDS_LAUNCHER_WRONG_SIGN_IN}, {"unknown-game", IDS_LAUNCHER_UNKNOWN_GAME},
-				{"disabled", IDS_LAUNCHER_DISABLED},           {"banned", IDS_LAUNCHER_BANNED},
-				{"deactivated", IDS_LAUNCHER_DEACTIVATED},     {"no-persona", IDS_LAUNCHER_NO_SOLDIER},
+			static constexpr std::pair<std::string_view, std::string_view> texts[] = {
+				{"wrong-sign-in", "launcher.refusal.wrong_sign_in"}, {"unknown-game", "launcher.refusal.unknown_game"},
+				{"disabled", "launcher.refusal.disabled"},           {"banned", "launcher.refusal.banned"},
+				{"deactivated", "launcher.refusal.deactivated"},     {"no-persona", "launcher.refusal.no_soldier"},
 			};
-			for (const auto& [code, text] : texts)
+			for (const auto& [code, id] : texts)
 				if (code == refusal)
-					return text;
-			return IDS_LAUNCHER_FAILED;
+					return id;
+			return "launcher.status.failed";
 		}
 
 		void updateMode(const State& state, const HWND dialog)
 		{
 			const bool host = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED;
-			SetDlgItemTextW(dialog, IDOK, loadString(state.instance, host ? IDS_LAUNCHER_HOST : IDS_LAUNCHER_PLAY).c_str());
+			setText(state, dialog, IDOK, host ? "launcher.button.host" : "launcher.button.play");
 			const int show = host ? SW_SHOW : SW_HIDE;
 			for (const int control : {IDC_MAP_LABEL, IDC_MAP, IDC_RANKED})
 				ShowWindow(GetDlgItem(dialog, control), show);
@@ -117,14 +116,31 @@ namespace openfeslhook::launcher
 			const LRESULT selected = SendDlgItemMessageW(dialog, IDC_LANGUAGE, CB_GETCURSEL, 0, 0);
 			if (selected < 0 || selected >= static_cast<LRESULT>(std::size(kLanguages)))
 				return {};
-			return kLanguages[selected].code;
+			return std::string(kLanguages[selected].code);
 		}
 
 		void prefill(State& state, const HWND dialog)
 		{
+			const i18n::Translation& texts = *state.texts;
+			SetWindowTextW(dialog, text(state, "hook.title").c_str());
+			SetDlgItemTextW(dialog, IDC_MODE_PLAY,
+			                platform::widen(texts.text("launcher.tile.play") + "\n" +
+			                                texts.text("launcher.tile.play.description")).c_str());
+			SetDlgItemTextW(dialog, IDC_MODE_HOST,
+			                platform::widen(texts.text("launcher.tile.host") + "\n" +
+			                                texts.text("launcher.tile.host.description")).c_str());
+			static constexpr std::pair<int, std::string_view> captions[] = {
+				{IDC_ACCOUNT_LABEL, "launcher.field.account"},   {IDC_PASSWORD_LABEL, "launcher.field.password"},
+				{IDC_REMEMBER, "launcher.field.remember"},       {IDC_LANGUAGE_LABEL, "launcher.field.language"},
+				{IDC_MAP_LABEL, "launcher.field.map"},           {IDC_RANKED, "launcher.field.ranked"},
+				{IDCANCEL, "launcher.button.cancel"},
+			};
+			for (const auto& [control, id] : captions)
+				setText(state, dialog, control, id);
+
 			const Defaults& defaults = *state.defaults;
 			for (const Language& language : kLanguages)
-				addItem(dialog, IDC_LANGUAGE, loadString(state.instance, language.name));
+				addItem(dialog, IDC_LANGUAGE, text(state, language.name));
 			LRESULT language = 0;
 			for (std::size_t i = 0; i < std::size(kLanguages); ++i)
 				if (defaults.language == kLanguages[i].code)
@@ -133,7 +149,7 @@ namespace openfeslhook::launcher
 
 			// The first map item leaves the choice to the server's own map list (no +loadLevel); the rest are the
 			// maps that list names, so the host can pin a starting one.
-			addItem(dialog, IDC_MAP, loadString(state.instance, IDS_MAP_DEFAULT));
+			addItem(dialog, IDC_MAP, text(state, "launcher.map.server_list"));
 			for (const std::string& map : *state.maps)
 				addItem(dialog, IDC_MAP, platform::widen(map));
 			const LRESULT map = defaults.map.empty()
@@ -142,12 +158,6 @@ namespace openfeslhook::launcher
 				                                          reinterpret_cast<LPARAM>(platform::widen(defaults.map).c_str()));
 			SendDlgItemMessageW(dialog, IDC_MAP, CB_SETCURSEL, static_cast<WPARAM>(map < 0 ? 0 : map), 0);
 
-			SetDlgItemTextW(dialog, IDC_MODE_PLAY,
-			                (loadString(state.instance, IDS_TILE_PLAY) + L"\n" +
-			                 loadString(state.instance, IDS_TILE_PLAY_SUB)).c_str());
-			SetDlgItemTextW(dialog, IDC_MODE_HOST,
-			                (loadString(state.instance, IDS_TILE_HOST) + L"\n" +
-			                 loadString(state.instance, IDS_TILE_HOST_SUB)).c_str());
 			SetDlgItemTextW(dialog, IDC_ACCOUNT, platform::widen(defaults.account).c_str());
 			CheckDlgButton(dialog, IDC_REMEMBER, defaults.remember ? BST_CHECKED : BST_UNCHECKED);
 			CheckRadioButton(dialog, IDC_MODE_PLAY, IDC_MODE_HOST,
@@ -163,14 +173,14 @@ namespace openfeslhook::launcher
 			const std::wstring password = windowText(GetDlgItem(dialog, IDC_PASSWORD));
 			if (account.empty() || password.empty())
 			{
-				setStatus(state, dialog, IDS_LAUNCHER_NEED_ACCOUNT);
+				setText(state, dialog, IDC_STATUS, "launcher.status.need_account");
 				MessageBeep(MB_ICONWARNING);
 				return;
 			}
 
 			state.busy = true;
 			enableControls(dialog, false);
-			setStatus(state, dialog, IDS_LAUNCHER_CONNECTING);
+			setText(state, dialog, IDC_STATUS, "launcher.status.signing_in");
 
 			auto* const job = new SignInJob{.dialog = dialog,
 			                                .server = *state.server,
@@ -194,12 +204,13 @@ namespace openfeslhook::launcher
 				enableControls(dialog, true);
 				updateMode(state, dialog); // the map controls follow the mode again
 				if (job.result.problem.empty())
-					setStatus(state, dialog, refusalText(job.result.refusal));
+					setText(state, dialog, IDC_STATUS, refusalText(job.result.refusal));
 				else
 				{
-					const UINT lead = job.result.unreachable ? IDS_LAUNCHER_NO_SERVER : IDS_LAUNCHER_FAILED;
-					const std::wstring text = loadString(state.instance, lead) + L"\n" + platform::widen(job.result.problem);
-					SetDlgItemTextW(dialog, IDC_STATUS, text.c_str());
+					const std::string_view lead =
+						job.result.unreachable ? "launcher.status.no_server" : "launcher.status.failed";
+					SetDlgItemTextW(dialog, IDC_STATUS,
+					                (text(state, lead) + L"\n" + platform::widen(job.result.problem)).c_str());
 				}
 				return;
 			}
@@ -305,7 +316,8 @@ namespace openfeslhook::launcher
 		const INITCOMMONCONTROLSEX classes{.dwSize = sizeof(INITCOMMONCONTROLSEX), .dwICC = ICC_STANDARD_CLASSES};
 		InitCommonControlsEx(&classes);
 
-		State state{.instance = instance, .server = &server, .defaults = &defaults, .maps = &maps};
+		const i18n::Translation texts = platform::displayTranslation(instance);
+		State state{.texts = &texts, .server = &server, .defaults = &defaults, .maps = &maps};
 		const INT_PTR result = DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_LAUNCHER), nullptr, dialogProc,
 		                                       reinterpret_cast<LPARAM>(&state));
 

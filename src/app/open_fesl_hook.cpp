@@ -14,12 +14,12 @@
 #include "platform/ipv4_look_ups.hpp"
 #include "platform/shell_redirect.hpp"
 #include "platform/text.hpp"
+#include "platform/translation.hpp"
 #include "platform/winhttp.hpp"
 #include "platform/winhttp_forwarder.hpp"
 #include "platform/winhttp_link.hpp"
 #include "platform/winhttp_redirect.hpp"
 #include "relay/ipv4_preference.hpp"
-#include "resource.h"
 #include "version.hpp"
 
 namespace openfeslhook::app
@@ -67,20 +67,14 @@ namespace openfeslhook::app
 				});
 		}
 
-		std::wstring loadString(const HMODULE library, const UINT id)
+		void showProblems(const HMODULE library, const std::string_view lead, const std::vector<std::string>& problems)
 		{
-			const wchar_t* text = nullptr;
-			const int length = LoadStringW(library, id, reinterpret_cast<wchar_t*>(&text), 0);
-			return length > 0 ? std::wstring(text, static_cast<std::size_t>(length)) : std::wstring();
-		}
-
-		void showProblems(const HMODULE library, const UINT lead, const std::vector<std::string>& problems)
-		{
-			std::wstring text = loadString(library, lead);
+			const i18n::Translation texts = platform::displayTranslation(library);
+			std::string text = texts.text(lead);
 			for (const std::string& problem : problems)
-				text += L"\n\n" + platform::widen(problem);
-			text += L"\n\n" + loadString(library, IDS_LOG_HINT);
-			MessageBoxW(nullptr, text.c_str(), loadString(library, IDS_DIALOG_CAPTION).c_str(),
+				text += "\n\n" + problem;
+			text += "\n\n" + texts.text("hook.start.log_hint");
+			MessageBoxW(nullptr, platform::widen(text).c_str(), platform::widen(texts.text("hook.title")).c_str(),
 			            MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
 		}
 	}
@@ -212,9 +206,9 @@ namespace openfeslhook::app
 		if (failure)
 		{
 			problems.insert(problems.begin(), *failure);
-			showProblems(library, IDS_START_FAILED, problems);
+			showProblems(library, "hook.start.failed", problems);
 		}
 		else if (!problems.empty())
-			showProblems(library, IDS_START_PROBLEMS, problems);
+			showProblems(library, "hook.start.problems", problems);
 	}
 }

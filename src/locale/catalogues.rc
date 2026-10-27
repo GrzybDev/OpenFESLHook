@@ -1,0 +1,6 @@
+#include <windows.h>
+
+// The compiled translation catalogues, each named by its language code. catalogues.targets compiles them from the
+// .po files next to this script into the intermediate folder, which it adds to this script's include path.
+EN RCDATA "en\\LC_MESSAGES\\openfeslhook.mo"
+PL RCDATA "pl\\LC_MESSAGES\\openfeslhook.mo"

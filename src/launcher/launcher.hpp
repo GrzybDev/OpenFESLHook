@@ -12,7 +12,7 @@ namespace openfeslhook::launcher
 	/// server. Inert for other games and for a launch that already carries +sessionId: the gate is found by a
 	/// version-independent string anchor, which is absent elsewhere, and the detour defers to the original when a
 	/// session is present. Call it before the game's entry point runs (from DllMain); it never throws.
-	/// @param self The hook's own module, whose dialog, strings and folder the launcher uses.
+	/// @param self The hook's own module, whose dialog, catalogues and folder the launcher uses.
 	void installLauncher(HMODULE self) noexcept;
 
 	/// One line per action installLauncher took (empty unless the gate was found or could not be hooked), kept so the

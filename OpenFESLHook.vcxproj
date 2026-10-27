@@ -78,6 +78,7 @@
     <ClInclude Include="src\platform\server_patch_points.hpp" />
     <ClInclude Include="src\platform\shell_redirect.hpp" />
     <ClInclude Include="src\platform\text.hpp" />
+    <ClInclude Include="src\platform\translation.hpp" />
     <ClInclude Include="src\platform\winhttp.hpp" />
     <ClInclude Include="src\platform\winhttp_forwarder.hpp" />
     <ClInclude Include="src\platform\winhttp_link.hpp" />
@@ -114,6 +115,7 @@
     <ClCompile Include="src\platform\server_patch_points.cpp" />
     <ClCompile Include="src\platform\shell_redirect.cpp" />
     <ClCompile Include="src\platform\text.cpp" />
+    <ClCompile Include="src\platform\translation.cpp" />
     <ClCompile Include="src\platform\winhttp.cpp" />
     <ClCompile Include="src\platform\winhttp_forwarder.cpp" />
     <ClCompile Include="src\platform\winhttp_link.cpp" />
@@ -132,6 +134,7 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="src\locale\catalogues.targets" />
   <Target Name="CheckServerUrl" BeforeTargets="ClCompile">
     <Error Condition="!$(OpenFESLHookServerUrl.StartsWith('ws://')) And !$(OpenFESLHookServerUrl.StartsWith('wss://'))" Text="OpenFESLHookServerUrl must be a ws:// or wss:// address, not $(OpenFESLHookServerUrl)" />
   </Target>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compiles the translation catalogues with msgfmt and embeds them in the project's module through catalogues.rc. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- msgfmt is a host tool of the vcpkg manifest (gettext[tools]); OpenFESLHook.props names the host triplet. -->
+    <OpenFESLHookMsgfmt>$(VcpkgInstalledDir)$(VcpkgHostTriplet)\tools\gettext\bin\msgfmt.exe</OpenFESLHookMsgfmt>
+    <OpenFESLHookCatalogueDir>$(IntDir)locale</OpenFESLHookCatalogueDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Catalogue Include="$(MSBuildThisFileDirectory)**\openfeslhook.po" />
+    <ResourceCompile Include="$(MSBuildThisFileDirectory)catalogues.rc">
+      <AdditionalIncludeDirectories>$(OpenFESLHookCatalogueDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemGroup>
+  <Target Name="CompileCatalogues" BeforeTargets="ResourceCompile" Inputs="@(Catalogue)"
+          Outputs="@(Catalogue->'$(OpenFESLHookCatalogueDir)\%(RecursiveDir)%(Filename).mo')">
+    <Error Condition="!Exists('$(OpenFESLHookMsgfmt)')" Text="msgfmt is missing at $(OpenFESLHookMsgfmt); vcpkg installs it with gettext[tools]." />
+    <MakeDir Directories="@(Catalogue->'$(OpenFESLHookCatalogueDir)\%(RecursiveDir)')" />
+    <!-- The header check is left out: it demands translator bookkeeping fields the catalogues do not keep. -->
+    <Exec Command="&quot;$(OpenFESLHookMsgfmt)&quot; --check-format --check-domain --output-file=&quot;$(OpenFESLHookCatalogueDir)\%(Catalogue.RecursiveDir)%(Catalogue.Filename).mo&quot; &quot;%(Catalogue.FullPath)&quot;" />
+  </Target>
+</Project>
