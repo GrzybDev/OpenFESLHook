@@ -45,6 +45,7 @@
   <ItemGroup>
     <ClInclude Include="src\config\settings.hpp" />
     <ClInclude Include="src\config\values.hpp" />
+    <ClInclude Include="src\discord\ipc.hpp" />
     <ClInclude Include="src\fesl\packet.hpp" />
     <ClInclude Include="src\http\destination.hpp" />
     <ClInclude Include="src\http\forwarder.hpp" />
@@ -78,6 +79,7 @@
   <ItemGroup>
     <ClCompile Include="src\config\settings.cpp" />
     <ClCompile Include="src\config\values.cpp" />
+    <ClCompile Include="src\discord\ipc.cpp" />
     <ClCompile Include="src\fesl\packet.cpp" />
     <ClCompile Include="src\http\destination.cpp" />
     <ClCompile Include="src\http\masking.cpp" />
