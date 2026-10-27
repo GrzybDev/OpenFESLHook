@@ -29,6 +29,9 @@ namespace openfeslhook::net
 	/// for.
 	using HttpForwards = std::function<std::optional<Target>(std::string_view host)>;
 
+	/// Makes where the relay server's presence for Discord goes, given the executor it then runs on.
+	using PresenceSinks = std::function<std::shared_ptr<relay::PresenceSink>(boost::asio::any_io_executor executor)>;
+
 	/// The local listeners the game is sent to, started when first needed, and the thread they and their connections
 	/// run on.
 	class LocalServices
@@ -38,7 +41,9 @@ namespace openfeslhook::net
 		/// @param upstream Makes the connections to the relay server, which the FESL and Theater services use unless
 		/// they go straight to a server of their own.
 		/// @param http Makes the forwarders of HTTP listeners.
-		explicit LocalServices(relay::UpstreamFactory upstream, HttpForwarders http = {});
+		/// @param presence Makes where the relay server's presence for Discord goes; without it, the hook asks for none.
+		explicit LocalServices(relay::UpstreamFactory upstream, HttpForwarders http = {},
+		                       const PresenceSinks& presence = {});
 
 		/// Stops every listener and connection and waits for the thread.
 		~LocalServices();

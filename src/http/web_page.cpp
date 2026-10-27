@@ -2,13 +2,25 @@
 #include "web_page.hpp"
 
 #include <boost/url/parse.hpp>
-#include <boost/url/url.hpp>
 
-#include "http/destination.hpp"
 #include "util/text.hpp"
 
 namespace openfeslhook::http
 {
+	boost::urls::url websiteOf(const Destination& destination)
+	{
+		namespace urls = boost::urls;
+
+		const urls::scheme scheme = destination.secure ? urls::scheme::https : urls::scheme::http;
+		urls::url website;
+		website.set_scheme_id(scheme);
+		website.set_host_address(destination.host);
+		if (destination.port != urls::default_port(scheme))
+			website.set_port_number(destination.port);
+		website.set_encoded_path("/");
+		return website;
+	}
+
 	std::optional<std::string> pageAddress(const std::string_view url, const config::HostMap<net::Protocol>& hosts,
 	                                       const config::HostMap<net::Target>& forwards,
 	                                       const relay::ServerAddress& server)
@@ -27,14 +39,7 @@ namespace openfeslhook::http
 
 		const std::uint16_t asked = parsed->has_port() ? parsed->port_number() : urls::default_port(scheme);
 		const std::optional<net::Target> forward = net::withPort(forwards.find(host), asked);
-		const Destination destination = destinationOf(server, forward);
-		const urls::scheme pageScheme = destination.secure ? urls::scheme::https : urls::scheme::http;
-		urls::url page;
-		page.set_scheme_id(pageScheme);
-		page.set_host_address(destination.host);
-		if (destination.port != urls::default_port(pageScheme))
-			page.set_port_number(destination.port);
-
+		urls::url page = websiteOf(destinationOf(server, forward));
 		const std::string_view path = parsed->encoded_path();
 		page.set_encoded_path(forward ? std::string(path) : std::format("/open/{}{}", host, path.empty() ? "/" : path));
 		if (parsed->has_query())

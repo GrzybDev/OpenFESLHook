@@ -164,6 +164,8 @@ namespace openfeslhook::app
 				return "\x1b[94m";
 			case log::Topic::Relay:
 				return "\x1b[38;5;208m";
+			case log::Topic::Discord:
+				return "\x1b[38;5;105m";
 			default:
 				return "\x1b[97m";
 			}

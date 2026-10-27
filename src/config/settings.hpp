@@ -39,6 +39,8 @@ namespace openfeslhook::config
 		HostMap<net::Protocol> hosts;
 		/// The hosts and domains whose services go straight to a server of their own, from [Forward].
 		HostMap<net::Target> forwards;
+		/// Whether Discord shows the presence the relay server sends for the game, from [Discord] Enabled.
+		bool discordPresence = true;
 		/// Where the log goes, from [Log].
 		LogOptions log;
 		/// What was wrong in the file, to report once the log is open.

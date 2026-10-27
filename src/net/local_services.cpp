@@ -11,10 +11,11 @@
 
 namespace openfeslhook::net
 {
-	LocalServices::LocalServices(relay::UpstreamFactory upstream, HttpForwarders http)
+	LocalServices::LocalServices(relay::UpstreamFactory upstream, HttpForwarders http, const PresenceSinks& presence)
 		: work_(io_.get_executor()),
-		  session_(std::make_shared<relay::Session>(io_.get_executor(), std::move(upstream))), http_(std::move(http)),
-		  thread_([this] { run(); })
+		  session_(std::make_shared<relay::Session>(io_.get_executor(), std::move(upstream),
+		                                            presence ? presence(io_.get_executor()) : nullptr)),
+		  http_(std::move(http)), thread_([this] { run(); })
 	{
 	}
 

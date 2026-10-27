@@ -21,6 +21,10 @@ namespace openfeslhook::platform
 	/// Call it before the game's entry point runs (from DllMain); it never throws.
 	void enableDedicatedServer() noexcept;
 
+	/// Tells whether the process was started as a Battlefield Heroes dedicated server: `+dedicated` on the command line
+	/// and no website link, whose text may hold anything.
+	[[nodiscard]] bool isDedicatedServer() noexcept;
+
 	/// One line per action taken by enableDedicatedServer (empty unless a dedicated server was patched or a requested
 	/// patch could not be placed), kept so the caller can log it once the log is open. The renderer DLL is patched
 	/// later, as it loads, and logs for itself.

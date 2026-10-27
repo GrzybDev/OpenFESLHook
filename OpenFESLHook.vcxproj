@@ -65,6 +65,7 @@
     <ClInclude Include="src\platform\browser_attributes.hpp" />
     <ClInclude Include="src\platform\dedicated_server.hpp" />
     <ClInclude Include="src\platform\detour.hpp" />
+    <ClInclude Include="src\platform\discord_pipe.hpp" />
     <ClInclude Include="src\platform\host_redirect.hpp" />
     <ClInclude Include="src\platform\engine_search.hpp" />
     <ClInclude Include="src\platform\game_objects.hpp" />
@@ -103,6 +104,7 @@
     <ClCompile Include="src\platform\browser_attributes.cpp" />
     <ClCompile Include="src\platform\dedicated_server.cpp" />
     <ClCompile Include="src\platform\detour.cpp" />
+    <ClCompile Include="src\platform\discord_pipe.cpp" />
     <ClCompile Include="src\platform\host_redirect.cpp" />
     <ClCompile Include="src\platform\engine_search.cpp" />
     <ClCompile Include="src\platform\game_objects.cpp" />

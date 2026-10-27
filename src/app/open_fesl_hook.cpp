@@ -3,6 +3,7 @@
 
 #include "app/log_output.hpp"
 #include "app/settings.hpp"
+#include "discord/rich_presence.hpp"
 #include "http/destination.hpp"
 #include "http/masking.hpp"
 #include "http/web_page.hpp"
@@ -10,6 +11,7 @@
 #include "logging/log.hpp"
 #include "net/local_services.hpp"
 #include "platform/dedicated_server.hpp"
+#include "platform/discord_pipe.hpp"
 #include "platform/host_redirect.hpp"
 #include "platform/ipv4_look_ups.hpp"
 #include "platform/shell_redirect.hpp"
@@ -44,7 +46,8 @@ namespace openfeslhook::app
 			                   target.transport == net::Transport::TlsUntrusted ? " with any certificate" : "");
 		}
 
-		net::LocalServices* startServices(const relay::ServerAddress& server, relay::Ipv4Preference& ipv4)
+		net::LocalServices* startServices(const relay::ServerAddress& server, relay::Ipv4Preference& ipv4,
+		                                  const bool discordPresence)
 		{
 			const std::wstring userAgent = platform::widen(std::format("OpenFESLHook/{} (Windows)", kVersion));
 			using platform::SessionMode;
@@ -52,6 +55,21 @@ namespace openfeslhook::app
 			HINTERNET const webSockets = platform::openSession(userAgent, SessionMode::Asynchronous).release();
 			log::info(log::Topic::Relay, "The relay server is {}://{}:{}{}", server.secure ? "wss" : "ws",
 			          platform::urlHost(server.host), server.port, http::maskTarget(server.target));
+
+			net::PresenceSinks presence;
+			if (!discordPresence)
+				log::debug(log::Topic::Discord, "[Discord] Enabled is off, so Discord shows nothing from the hook");
+			else if (platform::isDedicatedServer())
+				log::debug(log::Topic::Discord, "A dedicated server plays no game itself, so Discord shows nothing from "
+				                                "the hook");
+			else
+				presence = [website = http::websiteOf(http::destinationOf(server, std::nullopt))](
+					const boost::asio::any_io_executor& executor)
+				{
+					return std::make_shared<discord::RichPresence>(
+						executor, [executor] { return platform::openDiscordPipe(executor); }, GetCurrentProcessId(),
+						website);
+				};
 
 			// Never destroyed: the process may end while its threads run, when nothing may wait for them.
 			return new net::LocalServices(
@@ -64,7 +82,8 @@ namespace openfeslhook::app
 				{
 					return std::make_shared<platform::WinHttpForwarder>(session, http::destinationOf(server, forward), ipv4,
 					                                                    std::move(relayToken));
-				});
+				},
+				presence);
 		}
 
 		void showProblems(const HMODULE library, const std::string_view lead, const std::vector<std::string>& problems)
@@ -137,7 +156,7 @@ namespace openfeslhook::app
 					log::warning(log::Topic::Hook, "{}", problems.back());
 				}
 			}
-			net::LocalServices* const services = startServices(settings.server, *ipv4);
+			net::LocalServices* const services = startServices(settings.server, *ipv4, settings.discordPresence);
 			platform::installHostRedirect(settings.hosts, settings.blockUnknownHosts,
 			                              [services, forwards = settings.forwards](const std::string_view host,
 			                                                                       const net::Service& service)

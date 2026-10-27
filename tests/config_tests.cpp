@@ -62,6 +62,8 @@ FileLevl=trace
 Path=logi\zażółć.log
 [Logs]
 Console=1
+[Discord]
+Enabled=no
 )");
 
 		EXPECT_EQ(settings.server, relay::parseServerAddress("ws://relay.example.test:8000/ws"));
@@ -77,6 +79,7 @@ Console=1
 		EXPECT_FALSE(settings.log.consoleColors);
 		EXPECT_EQ(settings.log.fileLevel, log::Level::Debug);
 		EXPECT_EQ(settings.log.path, std::filesystem::path(u8"logi\\zażółć.log"));
+		EXPECT_FALSE(settings.discordPresence);
 
 		EXPECT_EQ(settings.problems.size(), 9u);
 		for (const std::string_view line : {"Log.Console", "BlockUnknownHosts", "*.theater.example.test:18395",
@@ -91,6 +94,7 @@ Console=1
 		const config::Settings missing = parse("");
 		EXPECT_EQ(missing.server, relay::parseServerAddress("wss://relay.example.test"));
 		EXPECT_EQ(missing.hosts.find("bfbc2-pc.fesl.ea.com"), net::Protocol::Fesl);
+		EXPECT_TRUE(missing.discordPresence);
 		EXPECT_TRUE(missing.problems.empty());
 
 		const config::Settings repeated = parse("[Log]\nConsole=1\nconsole=0\n");

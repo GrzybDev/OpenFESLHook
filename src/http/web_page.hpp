@@ -4,13 +4,20 @@
 #include <string>
 #include <string_view>
 
+#include <boost/url/url.hpp>
+
 #include "config/values.hpp"
+#include "http/destination.hpp"
 #include "net/direct_route.hpp"
 #include "net/service.hpp"
 #include "relay/server_address.hpp"
 
 namespace openfeslhook::http
 {
+	/// Builds the address of a server's website, at its root.
+	/// @param destination The server, whose scheme, host and port the address takes.
+	[[nodiscard]] boost::urls::url websiteOf(const Destination& destination);
+
 	/// Finds where a page of a redirected HTTP host opens in the system's browser, whose look-ups the hook does not
 	/// answer: at the same path on the host's [Forward] server, or at the relay server's /open/<host><path>.
 	/// @param url The address the game opens.

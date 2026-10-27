@@ -227,6 +227,7 @@ namespace openfeslhook::config
 					std::format("[Forward] {}: [Hosts] redirects no host it names, so the line has no effect", host));
 		}
 
+		reader.read("Discord", "Enabled", settings.discordPresence, parseFlag);
 		reader.read("Log", "Console", settings.log.console, parseFlag);
 		reader.read("Log", "File", settings.log.file, parseFlag);
 		reader.read("Log", "ConsoleLevel", settings.log.consoleLevel, parseLevel);

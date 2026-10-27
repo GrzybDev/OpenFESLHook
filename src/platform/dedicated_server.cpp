@@ -191,11 +191,8 @@ namespace openfeslhook::platform
 
 	void enableDedicatedServer() noexcept
 	{
-		const char* const commandLine = GetCommandLineA();
-		if (commandLine == nullptr || std::strstr(commandLine, "+dedicated") == nullptr)
-			return; // not a dedicated server; leave the game untouched
-		if (launcher::hasLaunchLink(commandLine))
-			return; // a website link starts the launcher to play, whatever text the link holds
+		if (!isDedicatedServer())
+			return;
 
 		const Image image = mainImage();
 		if (image.text == nullptr)
@@ -253,6 +250,13 @@ namespace openfeslhook::platform
 		{
 			messages.push_back(std::format("The dedicated server could not be set up: {}", problem.what()));
 		}
+	}
+
+	bool isDedicatedServer() noexcept
+	{
+		const char* const commandLine = GetCommandLineA();
+		return commandLine != nullptr && std::strstr(commandLine, "+dedicated") != nullptr &&
+		       !launcher::hasLaunchLink(commandLine);
 	}
 
 	const std::vector<std::string>& dedicatedServerMessages() noexcept

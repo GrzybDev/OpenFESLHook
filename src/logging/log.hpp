@@ -33,6 +33,8 @@ namespace openfeslhook::log
 		Http,
 		/// The WebSocket to the relay server.
 		Relay,
+		/// The connection to the Discord client and the presence it shows.
+		Discord,
 	};
 
 	/// Names a topic for the tag of its log lines.
@@ -51,6 +53,8 @@ namespace openfeslhook::log
 			return "HTTP";
 		case Topic::Relay:
 			return "Relay";
+		case Topic::Discord:
+			return "Discord";
 		default:
 			return "Hook";
 		}
