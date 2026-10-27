@@ -30,7 +30,8 @@ namespace openfeslhook::platform
 		std::map<HINTERNET, std::string> gConnections;
 
 		// Only the HTTP hosts go through the proxy; a FESL or Theater host in [Hosts] is a DirtySDK connection, which the
-		// Winsock look-up detour already serves, and the hook's own WinHTTP goes to the relay server, which is not named.
+		// Winsock look-up detour already serves, and the hook's own WinHTTP goes to the relay server or [Forward] servers,
+		// which the settings keep out of [Hosts].
 		bool goesThroughProxy(const wchar_t* serverName) noexcept
 		{
 			try

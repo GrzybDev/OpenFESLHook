@@ -205,7 +205,17 @@ namespace openfeslhook::config
 		{
 			try
 			{
-				settings.forwards.add(parseHostPattern(host), parseTarget(value, verifyCertificates));
+				const std::string pattern = parseHostPattern(host);
+				net::Target target = parseTarget(value, verifyCertificates);
+				// The hook's own connections to [Forward] servers pass the same detours that send [Hosts] to the hook.
+				if (settings.hosts.find(target.host))
+				{
+					settings.problems.push_back(std::format("[Forward] {}: [Hosts] redirects {} too, which would lead "
+					                                        "its connections back to the hook; the line is left out",
+					                                        host, target.host));
+					continue;
+				}
+				settings.forwards.add(pattern, std::move(target));
 			}
 			catch (const std::invalid_argument& problem)
 			{

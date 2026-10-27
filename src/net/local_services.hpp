@@ -24,6 +24,10 @@ namespace openfeslhook::net
 	/// to, whose port is already filled in.
 	using HttpForwarders = std::function<std::shared_ptr<http::Forwarder>(const std::optional<Target>& forward)>;
 
+	/// Tells which server a host's HTTP requests go straight to, if any, where port 0 stands for the port the game asked
+	/// for.
+	using HttpForwards = std::function<std::optional<Target>(std::string_view host)>;
+
 	/// The local listeners the game is sent to, started when first needed, and the thread they and their connections
 	/// run on.
 	class LocalServices
@@ -51,9 +55,11 @@ namespace openfeslhook::net
 		                                                  const std::optional<Target>& forward = std::nullopt);
 
 		/// Starts the single HTTP(S) proxy listener the WinHTTP redirect points the game at, unless it already runs,
-		/// and waits until it does. Its requests go to the relay server, as a plain HTTP listener's without a forward do.
+		/// and waits until it does. Each request goes straight to the server of its host, as a plain HTTP listener's
+		/// does, or to the relay server.
+		/// @param forwards Which server each host's requests go straight to; it only counts when the proxy starts.
 		/// @return The loopback port the proxy listens on, or nothing when it cannot listen.
-		[[nodiscard]] std::optional<std::uint16_t> startProxy();
+		[[nodiscard]] std::optional<std::uint16_t> startProxy(HttpForwards forwards = {});
 
 	private:
 		boost::asio::io_context io_;
@@ -62,6 +68,7 @@ namespace openfeslhook::net
 		HttpForwarders http_;
 		std::map<Service, std::uint16_t> ports_;
 		std::optional<std::uint16_t> proxyPort_;
+		std::map<Target, std::shared_ptr<http::Forwarder>> proxyForwarders_;
 		std::thread thread_;
 
 		std::optional<std::uint16_t> listen(const Service& service, std::string_view host,

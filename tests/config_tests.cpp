@@ -52,6 +52,7 @@ easo.example.test=ssl
 [Forward]
 VerifyCertificates=0
 *.fesl.example.test=tls://emulator.example.test:18390
+loop.fesl.example.test=gateway.fesl.example.test
 other.example.test=emulator.example.test
 *.other.example.test=emulator.example.test
 [log]
@@ -70,15 +71,17 @@ Console=1
 		const net::Target emulator{.host = "emulator.example.test", .port = 18390,
 		                           .transport = net::Transport::TlsUntrusted};
 		EXPECT_EQ(settings.forwards.find("pc.fesl.example.test"), emulator);
+		EXPECT_EQ(settings.forwards.find("loop.fesl.example.test"), emulator);
 		EXPECT_TRUE(settings.log.file);
 		EXPECT_FALSE(settings.log.console);
 		EXPECT_FALSE(settings.log.consoleColors);
 		EXPECT_EQ(settings.log.fileLevel, log::Level::Debug);
 		EXPECT_EQ(settings.log.path, std::filesystem::path(u8"logi\\zażółć.log"));
 
-		EXPECT_EQ(settings.problems.size(), 8u);
+		EXPECT_EQ(settings.problems.size(), 9u);
 		for (const std::string_view line : {"Log.Console", "BlockUnknownHosts", "*.theater.example.test:18395",
-		                                    "easo.example.test", "[Forward] other.example.test",
+		                                    "easo.example.test", "[Forward] loop.fesl.example.test",
+		                                    "[Forward] other.example.test",
 		                                    "[Forward] *.other.example.test", "FileLevl", "[Logs]"})
 			EXPECT_TRUE(mentions(settings.problems, line)) << line;
 	}

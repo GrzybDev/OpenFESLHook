@@ -55,11 +55,26 @@ namespace openfeslhook::test
 			std::vector<http::Request> requests_;
 		};
 
-		std::uint16_t startProxyWith(net::LocalServices& services)
+		std::uint16_t startProxyWith(net::LocalServices& services, net::HttpForwards forwards = {})
 		{
-			const std::optional<std::uint16_t> port = services.startProxy();
+			const std::optional<std::uint16_t> port = services.startProxy(std::move(forwards));
 			EXPECT_TRUE(port);
 			return port.value_or(0);
+		}
+
+		std::string proxyGet(const std::uint16_t proxyPort, const std::string_view url, const std::string_view host)
+		{
+			boost::asio::io_context io;
+			tcp::socket socket(io);
+			socket.connect({boost::asio::ip::address_v4::loopback(), proxyPort});
+			http::Request request(beast::http::verb::get, url, 11);
+			request.set(beast::http::field::host, host);
+			request.keep_alive(false);
+			beast::http::write(socket, request);
+			beast::flat_buffer buffer;
+			http::Response response;
+			beast::http::read(socket, buffer, response);
+			return response.body();
 		}
 	}
 
@@ -70,26 +85,49 @@ namespace openfeslhook::test
 		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>&) { return forwarder; });
 		const std::uint16_t port = startProxyWith(services);
 
-		boost::asio::io_context io;
-		tcp::socket socket(io);
-		socket.connect({boost::asio::ip::address_v4::loopback(), port});
-
 		// A plain HTTP proxy request names the host in the target itself, in absolute form.
-		http::Request request(beast::http::verb::get, "http://www.battlefieldheroes.com/nucleus/authToken", 11);
-		request.set(beast::http::field::host, "www.battlefieldheroes.com");
-		request.keep_alive(false);
-		beast::http::write(socket, request);
-
-		beast::flat_buffer buffer;
-		http::Response response;
-		beast::http::read(socket, buffer, response);
-
-		EXPECT_EQ(response.body(), "795745");
+		EXPECT_EQ(proxyGet(port, "http://www.battlefieldheroes.com/nucleus/authToken", "www.battlefieldheroes.com"),
+		          "795745");
 		const std::vector<http::Request> forwarded = forwarder->requests();
 		ASSERT_EQ(forwarded.size(), 1u);
 		// The forwarder, like a server, gets the path alone and the host in the Host header.
 		EXPECT_EQ(forwarded[0].target(), "/nucleus/authToken");
 		EXPECT_EQ(forwarded[0][beast::http::field::host], "www.battlefieldheroes.com");
+	}
+
+	TEST(WinHttpProxy, SendsTheRequestsOfAForwardedHostStraightToItsServer)
+	{
+		FakeRelayServer server;
+		const auto relay = std::make_shared<RecordingForwarder>();
+		const auto emulator = std::make_shared<RecordingForwarder>();
+		std::vector<std::optional<net::Target>> asked;
+		net::LocalServices services(server.factory(), [&](const std::optional<net::Target>& forward)
+		{
+			asked.push_back(forward);
+			return forward ? emulator : relay;
+		});
+		const std::uint16_t port = startProxyWith(services, [](const std::string_view host)
+		{
+			return host == "www.battlefieldheroes.com" ? std::optional(net::Target{.host = "emulator.example.test"})
+			                                           : std::nullopt;
+		});
+
+		EXPECT_EQ(proxyGet(port, "http://www.battlefieldheroes.com:8080/nucleus/authToken",
+		                   "www.battlefieldheroes.com:8080"),
+		          "795745");
+		EXPECT_EQ(proxyGet(port, "http://www.battlefieldheroes.com/nucleus/entitlements",
+		                   "www.battlefieldheroes.com"),
+		          "795745");
+		EXPECT_EQ(proxyGet(port, "http://easo.example.test/config", "easo.example.test"), "795745");
+
+		// A server without a port of its own gets the one the game asked for, each with a forwarder of its own.
+		EXPECT_EQ(asked, (std::vector<std::optional<net::Target>>{
+			                 std::nullopt, net::Target{.host = "emulator.example.test", .port = 8080},
+			                 net::Target{.host = "emulator.example.test", .port = 80}}));
+		ASSERT_EQ(emulator->requests().size(), 2u);
+		EXPECT_EQ(emulator->requests()[0].target(), "/nucleus/authToken");
+		ASSERT_EQ(relay->requests().size(), 1u);
+		EXPECT_EQ(relay->requests()[0].target(), "/config");
 	}
 
 	TEST(WinHttpProxy, TunnelsAndForwardsAnHttpsRequest)

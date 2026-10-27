@@ -16,6 +16,7 @@
 #include <boost/beast/http/read.hpp>
 #include <boost/beast/http/write.hpp>
 #include <boost/beast/ssl.hpp>
+#include <boost/url/parse.hpp>
 
 #include "http/masking.hpp"
 #include "logging/log.hpp"
@@ -47,7 +48,17 @@ namespace openfeslhook::net
 			request.target(slash == std::string::npos ? "/" : target.substr(slash));
 		}
 
-		/// Serves the game's HTTP requests on one stream of a kind, plain or TLS, sending each to a forwarder one after
+		// Splits a Host header or a CONNECT authority into its host and port, with the given port when it names none.
+		std::pair<std::string, std::uint16_t> hostAndPort(const std::string_view authority, const std::uint16_t port)
+		{
+			const boost::system::result<boost::urls::authority_view> parsed = boost::urls::parse_authority(authority);
+			if (!parsed)
+				return {std::string(authority), port};
+			const std::uint16_t named = parsed->port_number();
+			return {parsed->host_address(), named != 0 ? named : port};
+		}
+
+		/// Serves the game's HTTP requests on one stream of a kind, plain or TLS, sending each to its forwarder one after
 		/// another and answering a request the forwarder gets no response to with 502 Bad Gateway, as the HTTP listener
 		/// does; a separate type from HttpConnection so that the WinHTTP path does not touch the Winsock one.
 		template <typename Stream>
@@ -56,12 +67,13 @@ namespace openfeslhook::net
 		public:
 			/// Takes over a stream the game's requests arrive on.
 			/// @param stream The stream, already connected and, when TLS, past its handshake.
-			/// @param forwarder Where the requests go.
+			/// @param forwarders Picks where each request goes.
 			/// @param host The host of the CONNECT tunnel, used as the Host header of a request that lacks one.
+			/// @param port The port of a request whose Host header names none: the tunnel's, or 80 for plain HTTP.
 			/// @param buffer Bytes already read from the stream, if any.
-			Relay(Stream stream, std::shared_ptr<http::Forwarder> forwarder, std::string host,
+			Relay(Stream stream, ProxyForwarders forwarders, std::string host, const std::uint16_t port,
 			      beast::flat_buffer buffer = {})
-				: stream_(std::move(stream)), forwarder_(std::move(forwarder)), host_(std::move(host)),
+				: stream_(std::move(stream)), forwarders_(std::move(forwarders)), host_(std::move(host)), port_(port),
 				  buffer_(std::move(buffer))
 			{
 			}
@@ -80,8 +92,9 @@ namespace openfeslhook::net
 
 		private:
 			Stream stream_;
-			std::shared_ptr<http::Forwarder> forwarder_;
+			ProxyForwarders forwarders_;
 			std::string host_;
+			std::uint16_t port_;
 			beast::flat_buffer buffer_;
 			std::optional<beast::http::request_parser<beast::http::string_body>> parser_;
 			http::Response response_;
@@ -118,6 +131,8 @@ namespace openfeslhook::net
 				toOriginForm(request);
 				if (request.find(beast::http::field::host) == request.end() && !host_.empty())
 					request.set(beast::http::field::host, host_);
+				const auto [host, port] = hostAndPort(request[beast::http::field::host], port_);
+				const std::shared_ptr<http::Forwarder> forwarder = forwarders_(host, port);
 
 				std::string summary = std::format("{} {} to {}", request.method_string(),
 				                                  http::maskTarget(request.target()), request[beast::http::field::host]);
@@ -125,7 +140,7 @@ namespace openfeslhook::net
 					log::trace(log::Topic::Http, "Proxy {}, request headers {{{}}}", summary,
 					           http::describeHeaders(request));
 
-				forwarder_->forward(std::move(request),
+				forwarder->forward(std::move(request),
 				                    [self = this->shared_from_this(), version, keepAlive, summary = std::move(summary)](
 					                    std::optional<http::Response> response) mutable
 				{
@@ -186,9 +201,9 @@ namespace openfeslhook::net
 		};
 	}
 
-	ProxyConnection::ProxyConnection(boost::asio::ip::tcp::socket socket, std::shared_ptr<http::Forwarder> forwarder,
+	ProxyConnection::ProxyConnection(boost::asio::ip::tcp::socket socket, ProxyForwarders forwarders,
 	                                 std::shared_ptr<boost::asio::ssl::context> tls)
-		: stream_(std::move(socket)), forwarder_(std::move(forwarder)), tls_(std::move(tls))
+		: stream_(std::move(socket)), forwarders_(std::move(forwarders)), tls_(std::move(tls))
 	{
 	}
 
@@ -217,7 +232,7 @@ namespace openfeslhook::net
 			}
 
 			// An ordinary proxy request, plain HTTP; the stream and any pipelined bytes carry on in the relay.
-			std::make_shared<Relay<beast::tcp_stream>>(std::move(self->stream_), self->forwarder_, std::string(),
+			std::make_shared<Relay<beast::tcp_stream>>(std::move(self->stream_), self->forwarders_, std::string(), 80,
 			                                           std::move(self->buffer_))
 				->serve(std::move(request));
 		});
@@ -242,12 +257,11 @@ namespace openfeslhook::net
 				log::warning(log::Topic::Http, "The game sent {} bytes before the CONNECT tunnel's TLS, which are lost",
 				             self->buffer_.size());
 
-			const std::size_t colon = authority.rfind(':');
-			std::string host = colon == std::string::npos ? authority : authority.substr(0, colon);
+			auto [host, port] = hostAndPort(authority, 443);
 			const auto tls = std::make_shared<TlsStream>(std::move(self->stream_), *self->tls_);
 			beast::get_lowest_layer(*tls).expires_after(kIdleTimeout);
 			tls->async_handshake(boost::asio::ssl::stream_base::server,
-			                     [self, tls, host = std::move(host)](const beast::error_code& error) mutable
+			                     [self, tls, host = std::move(host), port](const beast::error_code& error) mutable
 			{
 				if (error)
 				{
@@ -255,7 +269,7 @@ namespace openfeslhook::net
 					           error.message());
 					return;
 				}
-				std::make_shared<Relay<TlsStream>>(std::move(*tls), self->forwarder_, std::move(host))->start();
+				std::make_shared<Relay<TlsStream>>(std::move(*tls), self->forwarders_, std::move(host), port)->start();
 			});
 		});
 	}

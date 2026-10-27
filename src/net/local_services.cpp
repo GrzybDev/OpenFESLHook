@@ -44,27 +44,43 @@ namespace openfeslhook::net
 		return boost::asio::post(io_, boost::asio::use_future([&] { return listen(service, host, forward); })).get();
 	}
 
-	std::optional<std::uint16_t> LocalServices::startProxy()
+	std::optional<std::uint16_t> LocalServices::startProxy(HttpForwards forwards)
 	{
 		if (!io_.get_executor().running_in_this_thread())
-			return boost::asio::post(io_, boost::asio::use_future([this] { return startProxy(); })).get();
+			return boost::asio::post(io_, boost::asio::use_future([&] { return startProxy(std::move(forwards)); })).get();
 
 		if (proxyPort_)
 			return proxyPort_;
 
 		try
 		{
-			std::shared_ptr<http::Forwarder> forwarder = http_ ? http_(std::nullopt) : nullptr;
-			if (!forwarder)
+			std::shared_ptr<http::Forwarder> relay = http_ ? http_(std::nullopt) : nullptr;
+			if (!relay)
 				throw std::runtime_error("nothing can forward HTTP requests");
 
+			// Runs on this thread, like every proxy connection, so the forwarders made here need no lock.
+			ProxyForwarders forwarders = [this, relay = std::move(relay), forwards = std::move(forwards)](
+				const std::string_view host, const std::uint16_t port)
+			{
+				const std::optional<Target> forward = withPort(forwards ? forwards(host) : std::nullopt, port);
+				if (!forward)
+					return relay;
+
+				if (const auto found = proxyForwarders_.find(*forward); found != proxyForwarders_.end())
+					return found->second;
+				// Kept only once it is made, so that a forwarder that cannot start is tried again by the next request.
+				std::shared_ptr<http::Forwarder> forwarder = http_(forward);
+				log::info(log::Topic::Http, "The game's WinHTTP requests to {} go straight to {}:{}", host, forward->host,
+				          forward->port);
+				return proxyForwarders_.emplace(*forward, std::move(forwarder)).first->second;
+			};
 			const auto tls = std::make_shared<boost::asio::ssl::context>(tls::proxyContext());
 			const Service service{Protocol::Http, 0x7f000001, 0};
 			const std::shared_ptr<Listener> listener =
 				Listener::start(io_, service, "the WinHTTP proxy",
-			                    [forwarder = std::move(forwarder), tls](boost::asio::ip::tcp::socket socket)
+			                    [forwarders = std::move(forwarders), tls](boost::asio::ip::tcp::socket socket)
 			{
-				std::make_shared<ProxyConnection>(std::move(socket), forwarder, tls)->start();
+				std::make_shared<ProxyConnection>(std::move(socket), forwarders, tls)->start();
 			});
 			proxyPort_ = listener->port();
 			log::info(log::Topic::Http, "Listening for {}", listener->description());

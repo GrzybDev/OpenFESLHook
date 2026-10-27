@@ -169,8 +169,9 @@ namespace openfeslhook::app
 			          settings.blockUnknownHosts ? "fail" : "go to the system's resolver");
 
 			// A game's account or store layer may speak WinHTTP, which resolves hosts itself and so slips past the
-			// look-up detour; a local proxy carries its requests to the hook's HTTP hosts on to the relay server.
-			if (const std::optional<std::uint16_t> proxyPort = services->startProxy())
+			// look-up detour; a local proxy carries its requests to the hook's HTTP hosts on to their servers.
+			if (const std::optional<std::uint16_t> proxyPort = services->startProxy(
+					[forwards = settings.forwards](const std::string_view host) { return forwards.find(host); }))
 			{
 				try
 				{
