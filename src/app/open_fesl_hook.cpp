@@ -14,6 +14,7 @@
 #include "platform/discord_pipe.hpp"
 #include "platform/host_redirect.hpp"
 #include "platform/ipv4_look_ups.hpp"
+#include "platform/module_path.hpp"
 #include "platform/shell_redirect.hpp"
 #include "platform/text.hpp"
 #include "platform/translation.hpp"
@@ -28,17 +29,6 @@ namespace openfeslhook::app
 {
 	namespace
 	{
-		std::filesystem::path modulePath(const HMODULE module)
-		{
-			std::wstring path(MAX_PATH, L'\0');
-			DWORD length;
-			while ((length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()))) == path.size())
-				path.resize(path.size() * 2);
-
-			path.resize(length);
-			return path;
-		}
-
 		std::string describe(const net::Target& target)
 		{
 			return std::format("{}://{}{}{}", target.transport == net::Transport::Plain ? "tcp" : "tls",
@@ -109,7 +99,7 @@ namespace openfeslhook::app
 			if (const int error = WSAStartup(MAKEWORD(2, 2), &winsock); error != 0)
 				throw std::runtime_error(std::format("Winsock could not start (error {})", error));
 
-			const std::filesystem::path folder = modulePath(library).parent_path();
+			const std::filesystem::path folder = platform::modulePath(library).parent_path();
 			const std::filesystem::path file = folder / L"OpenFESLHook.ini";
 			const config::Settings settings = loadSettings(file);
 			for (const std::string& problem : settings.problems)
@@ -120,7 +110,7 @@ namespace openfeslhook::app
 			log::info(log::Topic::Hook,
 			          "OpenFESLHook {} by Marek Grzyb (@GrzybDev), https://github.com/GrzybDev/OpenFESLHook", kVersion);
 			log::info(log::Topic::Hook, "Running in {}, process {}",
-			          platform::narrow(modulePath(nullptr).filename().wstring()), GetCurrentProcessId());
+			          platform::narrow(platform::modulePath(nullptr).filename().wstring()), GetCurrentProcessId());
 			// A dedicated server, if any, was already patched in DllMain; its outcome is logged now that the log is open.
 			for (const std::string& message : platform::dedicatedServerMessages())
 				log::info(log::Topic::Hook, "{}", message);

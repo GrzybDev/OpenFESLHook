@@ -4,9 +4,11 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <format>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -17,6 +19,7 @@
 #include "platform/browser_attributes.hpp"
 #include "platform/game_objects.hpp"
 #include "platform/player_entry.hpp"
+#include "platform/server_identity.hpp"
 #include "platform/server_manager_points.hpp"
 #include "platform/text.hpp"
 
@@ -93,6 +96,8 @@ namespace openfeslhook::platform
 
 		ServerManagerPoints points;
 		void* const* playerManager = nullptr;
+		std::filesystem::path identityFolder;
+		std::optional<IdentityKeeper> identity;
 		MethodType originalUpdate = nullptr;
 		ListenType originalListen = nullptr;
 		Stage stage = Stage::WaitingForLogin;
@@ -227,6 +232,14 @@ namespace openfeslhook::platform
 			void* const attributes = read<void*>(params + kAttributes);
 			setAttributes(attributes, kMapSetSlot, profileAttributes(profile(settings, readGameString(center))));
 			setAttributes(attributes, kMapSetSlot, liveAttributes(settings));
+			if (points.sentIdentity.found() && points.answeredIdentity.found())
+			{
+				// Every server on a PC listens on a port of its own, which keeps their identities apart.
+				const auto port = static_cast<std::uint16_t>(read<std::int32_t>(settings + kServerPort));
+				identity.emplace(identityFolder / std::format(L"OpenFESLHook_Identity_{}.ini", port),
+				                 points.sentIdentity, points.answeredIdentity);
+				identity->send(params);
+			}
 
 			slot<CreateGameType>(manager, kCreateGameSlot)(manager, params);
 			publishAt = GetTickCount64() + kPublishMilliseconds;
@@ -247,6 +260,8 @@ namespace openfeslhook::platform
 			const std::uint8_t* const settings = serverSettings();
 			if (game == nullptr || settings == nullptr)
 				return;
+			if (identity)
+				identity->keep(static_cast<const std::uint8_t*>(game));
 			setAttributes(game, kGameSetSlot, liveAttributes(settings));
 			slot<MethodType>(game, kGameFlushSlot)(game);
 		}
@@ -308,12 +323,14 @@ namespace openfeslhook::platform
 		}
 	}
 
-	std::string startServerManager(const ServerManagerPoints& found, void* const* const playerManagerGlobal) noexcept
+	std::string startServerManager(const ServerManagerPoints& found, void* const* const playerManagerGlobal,
+	                               const std::filesystem::path& folder) noexcept
 	{
 		try
 		{
 			points = found;
 			playerManager = playerManagerGlobal;
+			identityFolder = folder;
 			if (!points.complete())
 				return std::format(
 					"The dedicated server's game will not be listed in Theater: the hosting points were not all found "
@@ -340,13 +357,19 @@ namespace openfeslhook::platform
 			std::vector<std::string_view> missing = points.missingBrowserPoints();
 			if (playerManager == nullptr)
 				missing.emplace_back("player manager");
+			const std::string_view identityLine =
+				points.sentIdentity.found() && points.answeredIdentity.found()
+					? " Its identity in Theater is kept next to the hook for the server's next starts."
+					: " Theater gives it a new identity at every start, since the identity's fields were not found in "
+					  "this build.";
 			if (!missing.empty())
 				return std::format("Dedicated server: the game is listed in Theater once the backend has logged the "
 				                   "server in, without the server browser's attributes that need these parts, which "
-				                   "were not found in this build: {}.",
-				                   joinNames(missing));
-			return "Dedicated server: the game is listed in Theater, with the server browser's attributes, once the "
-			       "backend has logged the server in.";
+				                   "were not found in this build: {}.{}",
+				                   joinNames(missing), identityLine);
+			return std::format("Dedicated server: the game is listed in Theater, with the server browser's attributes, "
+			                   "once the backend has logged the server in.{}",
+			                   identityLine);
 		}
 		catch (const std::exception& problem)
 		{

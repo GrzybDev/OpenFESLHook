@@ -9,6 +9,7 @@
 #include "launcher/launch_link.hpp"
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
+#include "platform/module_path.hpp"
 #include "platform/text.hpp"
 
 namespace openfeslhook::launcher
@@ -20,16 +21,6 @@ namespace openfeslhook::launcher
 
 		using Gate = int(__fastcall*)(void* a, void* b, char* commandLine);
 		Gate originalGate = nullptr;
-
-		std::filesystem::path modulePath(const HMODULE module)
-		{
-			std::wstring path(MAX_PATH, L'\0');
-			DWORD length = 0;
-			while ((length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()))) == path.size())
-				path.resize(path.size() * 2);
-			path.resize(length);
-			return path;
-		}
 
 		std::filesystem::path rememberFile()
 		{
@@ -262,8 +253,8 @@ namespace openfeslhook::launcher
 		{
 			try
 			{
-				const std::filesystem::path exe = modulePath(nullptr);
-				const std::filesystem::path folder = modulePath(gSelf).parent_path();
+				const std::filesystem::path exe = platform::modulePath(nullptr);
+				const std::filesystem::path folder = platform::modulePath(gSelf).parent_path();
 				const config::Settings settings = app::loadSettings(folder / L"OpenFESLHook.ini");
 				const std::vector<std::string> maps = loadMaps(folder);
 				const Defaults defaults = loadDefaults();

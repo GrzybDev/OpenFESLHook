@@ -22,7 +22,7 @@ BOOL APIENTRY DllMain(const HMODULE module, const DWORD reason, LPVOID /*reserve
 
 	// A dedicated server is patched here, synchronously, because it has to happen before the game's entry point runs;
 	// it only reads the command line and rewrites the game's own code, neither of which needs the loader lock.
-	openfeslhook::platform::enableDedicatedServer();
+	openfeslhook::platform::enableDedicatedServer(module);
 
 	// The launcher detours the game's launch gate, which also has to be in place before the entry point runs. Only the
 	// detour is installed here; the launcher window and the relaunch it does run later, from the detour, once the gate

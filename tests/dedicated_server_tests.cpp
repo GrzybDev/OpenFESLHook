@@ -211,6 +211,11 @@ namespace openfeslhook::platform
 			EXPECT_EQ(rva(image, points.mapList), 0xDC1534u);
 			EXPECT_EQ(rva(image, points.mapEntry), 0x08FD1Au);
 			EXPECT_EQ(points.currentMapField, 0x1Cu);
+			// The game's identity in Theater, as CGAM sends it and as the hosted game keeps Theater's answer.
+			EXPECT_EQ(points.sentIdentity.ugid, 0x12Cu);
+			EXPECT_EQ(points.sentIdentity.secret, 0x16Cu);
+			EXPECT_EQ(points.answeredIdentity.ugid, 0x929u);
+			EXPECT_EQ(points.answeredIdentity.secret, 0x969u);
 		}
 
 		TEST(DedicatedServer, LocatesTheGameServerNetworkingInTheClientExecutable)

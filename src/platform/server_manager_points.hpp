@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "platform/image_search.hpp"
+#include "platform/server_identity.hpp"
 
 namespace openfeslhook::platform
 {
@@ -53,6 +54,12 @@ namespace openfeslhook::platform
 
 		/// Where the map list holds the index of the map being played.
 		std::uint32_t currentMapField = 0;
+
+		/// Where DirtySDK's create-game parameters hold the identity CGAM sends.
+		IdentityFields sentIdentity;
+
+		/// Where DirtySDK's hosted game holds the identity Theater answered its CGAM with.
+		IdentityFields answeredIdentity;
 
 		/// Whether every point that listing the game needs was found; the server browser's points are not among them.
 		[[nodiscard]] bool complete() const noexcept;

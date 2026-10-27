@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <windows.h>
+
 namespace openfeslhook::platform
 {
 	/// When the process was started as a Battlefield Heroes dedicated server (`+dedicated` on the command line, and no
@@ -19,7 +21,8 @@ namespace openfeslhook::platform
 	/// search holds across the game's releases and is inert for the client and for other games, where the anchors are
 	/// absent.
 	/// Call it before the game's entry point runs (from DllMain); it never throws.
-	void enableDedicatedServer() noexcept;
+	/// @param library This library, whose folder keeps the server's identity in Theater.
+	void enableDedicatedServer(HMODULE library) noexcept;
 
 	/// Tells whether the process was started as a Battlefield Heroes dedicated server: `+dedicated` on the command line
 	/// and no website link, whose text may hold anything.

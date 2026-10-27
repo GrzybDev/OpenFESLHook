@@ -16,6 +16,7 @@
 #include "logging/log.hpp"
 #include "platform/detour.hpp"
 #include "platform/image_search.hpp"
+#include "platform/module_path.hpp"
 #include "platform/net_server.hpp"
 #include "platform/player_entry.hpp"
 #include "platform/server_manager.hpp"
@@ -213,7 +214,7 @@ namespace openfeslhook::platform
 		}
 	}
 
-	void enableDedicatedServer() noexcept
+	void enableDedicatedServer(const HMODULE library) noexcept
 	{
 		if (!isDedicatedServer())
 			return;
@@ -258,7 +259,7 @@ namespace openfeslhook::platform
 			const ServerManagerPoints hosting = locateServerManagerPoints(image);
 			const NetServerPoints network = locateNetServerPoints(image);
 			const PlayerEntryPoints entry = locatePlayerEntryPoints(image);
-			messages.push_back(startServerManager(hosting, entry.playerManager));
+			messages.push_back(startServerManager(hosting, entry.playerManager, modulePath(library).parent_path()));
 			messages.push_back(startNetServer(network));
 			messages.push_back(startPlayerEntry(entry));
 

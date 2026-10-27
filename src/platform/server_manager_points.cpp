@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "platform/server_manager_points.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #include "platform/engine_search.hpp"
+#include "platform/game_objects.hpp"
 
 namespace openfeslhook::platform
 {
@@ -29,6 +31,20 @@ namespace openfeslhook::platform
 		// the current map's getter is.
 		constexpr std::size_t kBuilderReach = 0x200;
 		constexpr std::size_t kGetterLength = 0x20;
+		// CGAM's serializer sends the parameters' UGID and then their secret: lea ecx, [params+UGID]; test ecx, ecx;
+		// jz; call (the UGID's text); push eax; push "UGID"; mov ecx, esi; call; lea eax, [params+secret]; push eax;
+		// push "SECRET".
+		constexpr std::string_view kSentIdentity = "8D ?? ?? ?? ?? ?? 85 C9 74 ?? E8 ?? ?? ?? ?? 50 68 ?? ?? ?? ?? 8B CE "
+		                                           "E8 ?? ?? ?? ?? 8D ?? ?? ?? ?? ?? 50 68 ?? ?? ?? ??";
+		constexpr std::size_t kSentIdentityLength = 40;
+		constexpr std::size_t kSentUgidPush = 16;
+		// The hosted game takes Theater's answer to its CGAM: it sets the answer's secret (push; mov ecx, esi; call),
+		// then copies its UGID (push; lea ecx, [esi+UGID]; call). The secret's setter copies at most 0x80 bytes to its
+		// field: push [esp+4]; add ecx, secret; push 0x80.
+		constexpr std::string_view kAnsweredIdentity =
+			"8D 45 ?? 50 8B CE E8 ?? ?? ?? ?? 8D 85 ?? ?? ?? ?? 50 8D 8E ?? ?? ?? ?? E8";
+		constexpr std::string_view kSecretSetter = "FF 74 24 04 81 C1 ?? ?? ?? ?? 68 80 00 00 00";
+		constexpr std::size_t kSecretSetterLength = 15;
 
 		// The start of a method without a frame of its own, which follows the previous function's return or padding
 		// with pushes of the registers it keeps and `mov esi, ecx`; null when none begins within reach before an
@@ -65,6 +81,32 @@ namespace openfeslhook::platform
 				points.currentMapField = entry[2];
 				points.mapEntry = callTarget(image, entry + 3);
 			}
+		}
+
+		IdentityFields sentIdentity(const Image& image)
+		{
+			const std::vector<const std::uint8_t*> secrets = findStrings(image, "SECRET");
+			for (const std::uint8_t* const ugid : findStrings(image, "UGID"))
+				for (const std::uint8_t* const push : findPushesOf(image, ugid))
+				{
+					const std::uint8_t* const start = push - kSentUgidPush;
+					if (start < image.text || findSignature(start, kSentIdentityLength, kSentIdentity) != start)
+						continue;
+					const auto* const secret =
+						reinterpret_cast<const std::uint8_t*>(globalAt(image, start + kSentIdentityLength - 4));
+					if (std::ranges::find(secrets, secret) != secrets.end())
+						return {.ugid = read<std::uint32_t>(start + 2), .secret = read<std::uint32_t>(start + 30)};
+				}
+			return {};
+		}
+
+		IdentityFields answeredIdentity(const Image& image)
+		{
+			const std::uint8_t* const copy = findSignature(image.text, image.textSize, kAnsweredIdentity);
+			const std::uint8_t* const setter = copy != nullptr ? callTarget(image, copy + 6) : nullptr;
+			if (setter == nullptr || findSignature(setter, kSecretSetterLength, kSecretSetter) != setter)
+				return {};
+			return {.ugid = read<std::uint32_t>(copy + 20), .secret = read<std::uint32_t>(setter + 6)};
 		}
 	}
 
@@ -124,6 +166,8 @@ namespace openfeslhook::platform
 		if (const std::uint8_t* const builder =
 		        framelessMethodStart(image, findPushOf(image, findString(image, "elo_rank"))))
 			fromSettingsToParams(image, builder, points);
+		points.sentIdentity = sentIdentity(image);
+		points.answeredIdentity = answeredIdentity(image);
 		return points;
 	}
 }

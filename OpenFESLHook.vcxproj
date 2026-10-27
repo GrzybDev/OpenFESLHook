@@ -71,10 +71,12 @@
     <ClInclude Include="src\platform\game_objects.hpp" />
     <ClInclude Include="src\platform\image_search.hpp" />
     <ClInclude Include="src\platform\ipv4_look_ups.hpp" />
+    <ClInclude Include="src\platform\module_path.hpp" />
     <ClInclude Include="src\platform\net_server.hpp" />
     <ClInclude Include="src\platform\net_server_points.hpp" />
     <ClInclude Include="src\platform\player_entry.hpp" />
     <ClInclude Include="src\platform\player_entry_points.hpp" />
+    <ClInclude Include="src\platform\server_identity.hpp" />
     <ClInclude Include="src\platform\server_manager.hpp" />
     <ClInclude Include="src\platform\server_manager_points.hpp" />
     <ClInclude Include="src\platform\server_patch_points.hpp" />
@@ -110,10 +112,12 @@
     <ClCompile Include="src\platform\game_objects.cpp" />
     <ClCompile Include="src\platform\image_search.cpp" />
     <ClCompile Include="src\platform\ipv4_look_ups.cpp" />
+    <ClCompile Include="src\platform\module_path.cpp" />
     <ClCompile Include="src\platform\net_server.cpp" />
     <ClCompile Include="src\platform\net_server_points.cpp" />
     <ClCompile Include="src\platform\player_entry.cpp" />
     <ClCompile Include="src\platform\player_entry_points.cpp" />
+    <ClCompile Include="src\platform\server_identity.cpp" />
     <ClCompile Include="src\platform\server_manager.cpp" />
     <ClCompile Include="src\platform\server_manager_points.cpp" />
     <ClCompile Include="src\platform\server_patch_points.cpp" />
