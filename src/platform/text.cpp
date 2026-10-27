@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "text.hpp"
 
+#include <shellapi.h>
+
 namespace openfeslhook::platform
 {
 	namespace
@@ -54,5 +56,26 @@ namespace openfeslhook::platform
 		const bool utf8 = bytes.empty() || MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bytes.data(),
 		                                                       static_cast<int>(bytes.size()), nullptr, 0) != 0;
 		return utf8 ? std::string(bytes) : narrow(toWide(CP_ACP, bytes));
+	}
+
+	std::string joinNames(const std::span<const std::string_view> names)
+	{
+		std::string list;
+		for (const std::string_view name : names)
+			list += std::format("{}{}", list.empty() ? "" : ", ", name);
+		return list;
+	}
+
+	std::vector<std::wstring> splitCommandLine(const std::wstring& commandLine)
+	{
+		// CommandLineToArgvW reads an empty line as this program's own path.
+		if (commandLine.empty())
+			return {};
+		int count = 0;
+		const std::unique_ptr<LPWSTR, decltype(&LocalFree)> arguments(CommandLineToArgvW(commandLine.c_str(), &count),
+		                                                               &LocalFree);
+		if (!arguments)
+			return {};
+		return {arguments.get(), arguments.get() + count};
 	}
 }

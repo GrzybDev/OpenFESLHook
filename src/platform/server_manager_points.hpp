@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
+#include <vector>
 
 #include "platform/image_search.hpp"
 
@@ -36,11 +38,27 @@ namespace openfeslhook::platform
 		void* const* serverSettings = nullptr;
 
 		/// The entry of the virtual-function table that holds the GameManager's listen, which opens the socket the
-		/// players' games connect to; the server builds open it on the server's own port.
+		/// players' games connect to; hosting opens it on the server's own port.
 		const void* const* gameManagerListen = nullptr;
 
-		/// Whether every point was found.
+		/// Fills the server game settings' create-game parameters from the settings: the game's version, the seats, the
+		/// join mode and the attributes the server browser shows. Nothing in the client build calls it.
+		const void* settingsToParams = nullptr;
+
+		/// The global that holds the map list the server plays through.
+		void* const* mapList = nullptr;
+
+		/// Returns the map list's entry at an index, or null for an index past its end.
+		const void* mapEntry = nullptr;
+
+		/// Where the map list holds the index of the map being played.
+		std::uint32_t currentMapField = 0;
+
+		/// Whether every point that listing the game needs was found; the server browser's points are not among them.
 		[[nodiscard]] bool complete() const noexcept;
+
+		/// The names of the server browser's points that were not found; empty when every one was.
+		[[nodiscard]] std::vector<std::string_view> missingBrowserPoints() const;
 	};
 
 	/// Finds the server manager's points in the game executable.

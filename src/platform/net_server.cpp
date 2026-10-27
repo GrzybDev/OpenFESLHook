@@ -18,8 +18,7 @@ namespace openfeslhook::platform
 {
 	namespace
 	{
-		// The network server's fields, as the 1.42 server build's init sets them and the client build's shutdown and
-		// packet handling use them.
+		// The network server's fields, as the client build's shutdown, network thread and packet handling use them.
 		constexpr std::size_t kConnectionMap = 0x08;       // std::map of the connections by id
 		constexpr std::size_t kConnectionMapHeader = 0x0C; // that map's header node
 		constexpr std::size_t kPollCursor = 0x14;          // where the next poll of the connections resumes in that map
@@ -73,7 +72,7 @@ namespace openfeslhook::platform
 			kNoThread = 9,
 		};
 
-		// Why the upkeep drops a connection, as the 1.42 server build gives it.
+		// Why the upkeep drops a connection: the hook's choice among the game's reasons.
 		constexpr std::int32_t kConnectionLost = 6;
 		constexpr std::int32_t kTimedOut = 10;
 
@@ -110,12 +109,6 @@ namespace openfeslhook::platform
 		std::mutex connectRequestsLock;
 		std::unordered_map<std::int32_t, ULONGLONG> connectRequests; // when each player's was last handed on
 
-		template <typename Function>
-		Function as(const void* function) noexcept
-		{
-			return reinterpret_cast<Function>(const_cast<void*>(function));
-		}
-
 		void* allocate(const std::size_t size) noexcept
 		{
 			return as<AllocateType>(points.allocate)(size);
@@ -146,8 +139,8 @@ namespace openfeslhook::platform
 			write(server + kClock + 8, frequency);
 			write<std::uint32_t>(server + kClock + 0x10, 0);
 
-			// The server builds always had sv.serverIP set by their settings; left empty, it means every interface,
-			// which the console's address line can resolve where it cannot resolve an empty host.
+			// The hook's choice: an empty sv.serverIP means every interface, which the console's address line can
+			// resolve where it cannot resolve an empty host.
 			const std::string ip = readGameString(host);
 			const std::string address = std::format("{}:{}", ip.empty() ? "0.0.0.0" : ip, port);
 			const GameString listenAddress(address);
@@ -252,10 +245,10 @@ namespace openfeslhook::platform
 				}
 		}
 
-		// The 1.42 server build's upkeep of the connections: it pings each one every three seconds, times out the
-		// silent ones, lets the slots held for returning players go when their time is up and frees what was
-		// disconnected. A connection that had come all the way in and times out gets a timeout event, which the game
-		// server reads with the connection's other events.
+		// The upkeep of the connections, made of the parts the client build keeps (with the hook's choice of a ping
+		// every three seconds): it pings each connection, times out the silent ones, lets the slots held for returning
+		// players go when their time is up and frees what was disconnected. A connection that had come all the way in
+		// and times out gets a timeout event, which the game server reads with the connection's other events.
 		void upkeep(std::uint8_t* server)
 		{
 			if (read<std::uint32_t>(server + kLastUpkeep) == 0)
@@ -267,8 +260,6 @@ namespace openfeslhook::platform
 			{
 				const auto id = read<std::int32_t>(node + GameMapNode::key);
 				const auto* const connection = read<const std::uint8_t*>(node + GameMapNode::value);
-				// The 1.42 server build drops the connection its network thread last read an event of here; the one
-				// whose ping could not be sent is meant.
 				if (read<std::uint32_t>(connection + kLastPing) + kPingInterval < now &&
 				    as<PingType>(points.ping)(server, id) == kNoSocket)
 					disconnect(server, id, kConnectionLost);
@@ -298,9 +289,9 @@ namespace openfeslhook::platform
 			write(server + kLastUpkeep, now);
 		}
 
-		// The 1.42 server build's network thread looks after the connections each time it wakes, under the lock the
-		// reading of their events takes; the client build's thread calls a stub there, so a player who left could not
-		// come back, as the connection and its id were never freed. This does it once a frame, under the same lock.
+		// The client build's network thread calls a stub where it would look after the connections, so a player who
+		// left could not come back, as the connection and its id were never freed. This looks after them once a
+		// frame, under the lock the reading of their events takes.
 		void lookAfterConnections(std::uint8_t* game)
 		{
 			auto* const server = read<std::uint8_t*>(game + points.netServerField);
@@ -320,8 +311,8 @@ namespace openfeslhook::platform
 			as<LockType>(points.unlock)(server + kLock);
 		}
 
-		// The 1.42 server build handles its network at the start of every frame of the game server; the client build
-		// keeps that handling but never calls it.
+		// The client build keeps the game server's handling of its network but never calls it; the hook calls it at
+		// the start of every frame of the game server.
 		bool __fastcall updateDetour(std::uint8_t* game, void* /*edx*/, const std::int32_t frames, const float seconds)
 		{
 			lookAfterConnections(game);

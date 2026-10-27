@@ -9,6 +9,7 @@
 #include "logging/log.hpp"
 #include "platform/game_objects.hpp"
 #include "platform/player_entry_points.hpp"
+#include "platform/text.hpp"
 
 namespace openfeslhook::platform
 {
@@ -63,7 +64,7 @@ namespace openfeslhook::platform
 		constexpr std::int32_t kConnectionEvent = 1;
 		constexpr std::int32_t kPlayerInfo = 1;
 
-		// The reasons a connection is dropped with, as the 1.42 server build gives them.
+		// The reasons a connection is dropped with: the hook's choice among the game's reasons.
 		constexpr std::int32_t kServerFull = 2;
 		constexpr std::int32_t kConnectionTaken = 0x0D;
 		constexpr std::int32_t kProfilePlayingElsewhere = 0x20;
@@ -100,12 +101,6 @@ namespace openfeslhook::platform
 		PlayerEntryPoints points;
 		ReceiveType originalReceive = nullptr;
 
-		template <typename Function>
-		Function as(const void* function) noexcept
-		{
-			return reinterpret_cast<Function>(const_cast<void*>(function));
-		}
-
 		void* global(void* const* holder) noexcept
 		{
 			return *holder;
@@ -125,8 +120,8 @@ namespace openfeslhook::platform
 		}
 
 		// A full server lets a player on a reserved slot in by dropping the connection with the highest id whose
-		// player holds none, or refuses the newcomer when there is none; either way the entry then carries on, as in
-		// the 1.42 server build.
+		// player holds none, or refuses the newcomer when there is none; either way the entry then carries on (the
+		// hook's choice).
 		void makeRoom(std::uint8_t* server, const std::int32_t connection)
 		{
 			void* const reserved = global(points.reservedSlots);
@@ -161,9 +156,7 @@ namespace openfeslhook::platform
 				*slot<IntegerSettingType>(settings, kIntegerSettingSlot)(settings, name.get(), &fallback));
 			const auto teamSeats = static_cast<std::uint32_t>(std::floor(static_cast<float>(maxPlayers) * 0.5f));
 			void* const players = global(points.playerManager);
-			void* const team = slot<ObjectOfType>(players, kTeamSlot)(players, read<std::int32_t>(info + kInfoTeam));
-			const std::uint32_t teamPlayers =
-				team != nullptr ? read<std::uint32_t>(static_cast<std::uint8_t*>(team) + kTeamPlayerCount) : 0;
+			const std::uint32_t teamPlayers = teamPlayerCount(players, read<std::int32_t>(info + kInfoTeam));
 			const std::uint32_t playerCount = slot<CountType>(players, kPlayerCountSlot)(players);
 			const auto reservedSlots =
 				read<std::uint32_t>(static_cast<std::uint8_t*>(global(points.serverSettings)) + kReservedSlotCount);
@@ -186,7 +179,7 @@ namespace openfeslhook::platform
 			slot<PostEventType>(events, kPostEventSlot)(events, 1, 4, player, 0.0f);
 			const auto allocate = as<AllocateType>(points.allocate);
 			const auto construct = as<ConstructEventType>(points.constructCreatePlayerEvent);
-			// As in the 1.42 server build, one event goes to every game and another to the newcomer's game.
+			// The hook's choice: one event goes to every game and another to the newcomer's game.
 			if (void* const memory = allocate(points.createPlayerEventSize))
 				slot<TakeType>(game, kSendToAllSlot)(game, construct(memory, player, 1));
 			if (void* const memory = allocate(points.createPlayerEventSize))
@@ -222,7 +215,8 @@ namespace openfeslhook::platform
 			as<TakeType>(points.addToScoring)(server + kScoring, player);
 		}
 
-		// The 1.42 server build's GameServer::onPlayerInfo.
+		// GameServer::onPlayerInfo, which the client build lacks, rebuilt from the parts of GameServer::addLocalPlayer
+		// and the hook's choices where those end.
 		void takePlayerIn(std::uint8_t* game, std::int32_t connection, const std::uint8_t* info)
 		{
 			std::uint8_t* const server = game + points.partOffset;
@@ -302,26 +296,27 @@ namespace openfeslhook::platform
 		}
 	}
 
+	std::uint32_t teamPlayerCount(void* playerManager, const std::int32_t team)
+	{
+		void* const players = slot<ObjectOfType>(playerManager, kTeamSlot)(playerManager, team);
+		return players != nullptr ? read<std::uint32_t>(static_cast<std::uint8_t*>(players) + kTeamPlayerCount) : 0;
+	}
+
 	std::string startPlayerEntry(const PlayerEntryPoints& found) noexcept
 	{
 		try
 		{
 			points = found;
 			if (const std::vector<std::string_view> missing = points.missing(); !missing.empty())
-			{
-				std::string names;
-				for (const std::string_view name : missing)
-					names += std::format("{}{}", names.empty() ? "" : ", ", name);
 				return std::format("The dedicated server will not take players in: these parts of the player entry "
 				                   "were not found in this build: {}.",
-				                   names);
-			}
+				                   joinNames(missing));
 			void* original = nullptr;
 			if (!replaceEntry(points.listenerTable + kListenerReceiveSlot, reinterpret_cast<void*>(&receiveDetour),
 			                  original))
 				return "The dedicated server will not take players in: the game server's events could not be followed.";
 			originalReceive = reinterpret_cast<ReceiveType>(original);
-			return "Dedicated server: joining players are taken in as the server build does.";
+			return "Dedicated server: joining players are taken in.";
 		}
 		catch (const std::exception& problem)
 		{

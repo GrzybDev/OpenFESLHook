@@ -36,6 +36,14 @@ namespace openfeslhook::platform
 		return reinterpret_cast<Function>((*static_cast<void* const* const*>(object))[index]);
 	}
 
+	/// A function of the game, known by its address, as the type it is called through.
+	/// @param function The function's address.
+	template <typename Function>
+	[[nodiscard]] Function as(const void* function) noexcept
+	{
+		return reinterpret_cast<Function>(const_cast<void*>(function));
+	}
+
 	/// Whether a range of memory is committed and readable.
 	/// @param at The range's first byte.
 	/// @param length The range's length.

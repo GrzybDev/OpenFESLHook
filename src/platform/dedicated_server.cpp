@@ -232,7 +232,7 @@ namespace openfeslhook::platform
 			const ServerManagerPoints hosting = locateServerManagerPoints(image);
 			const NetServerPoints network = locateNetServerPoints(image);
 			const PlayerEntryPoints entry = locatePlayerEntryPoints(image);
-			messages.push_back(startServerManager(hosting));
+			messages.push_back(startServerManager(hosting, entry.playerManager));
 			messages.push_back(startNetServer(network));
 			messages.push_back(startPlayerEntry(entry));
 

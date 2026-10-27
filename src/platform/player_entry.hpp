@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "platform/player_entry_points.hpp"
@@ -7,13 +8,18 @@
 namespace openfeslhook::platform
 {
 	/// Takes the players who join a Battlefield Heroes dedicated server run from the client build into the game, which
-	/// the client build leaves out. When a joining player's game sends its player info, it does what the 1.42 server
-	/// build's GameServer::onPlayerInfo does: tells the PrePlayerConnect scripts, refuses a full server (a player on a
-	/// reserved slot makes room instead), drops an older connection of the same profile, creates the player with the
-	/// game's info and announces it, and sends the server info, after which the game loads the level. It runs from
-	/// the game server's event listener, on the game's main thread. Call it once, from enableDedicatedServer; it
+	/// the client build leaves out. When a joining player's game sends its player info, it does the work of the
+	/// GameServer::onPlayerInfo the client build lacks: tells the PrePlayerConnect scripts, refuses a full server (a
+	/// player on a reserved slot makes room instead), drops an older connection of the same profile, creates the player
+	/// with the game's info and announces it, and sends the server info, after which the game loads the level. It runs
+	/// from the game server's event listener, on the game's main thread. Call it once, from enableDedicatedServer; it
 	/// never throws.
 	/// @param found Its points, found before any module replaced an entry of the game's tables.
 	/// @return The line to log about what was set up.
 	[[nodiscard]] std::string startPlayerEntry(const PlayerEntryPoints& found) noexcept;
+
+	/// The players on one of the teams of the game's player manager, 0 for a team it does not have.
+	/// @param playerManager The player manager.
+	/// @param team The team's number: 1 for the national army, 2 for the royal one.
+	[[nodiscard]] std::uint32_t teamPlayerCount(void* playerManager, std::int32_t team);
 }

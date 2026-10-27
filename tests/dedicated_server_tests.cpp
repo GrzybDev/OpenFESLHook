@@ -203,6 +203,12 @@ namespace openfeslhook::platform
 			// The update the server manager ticks from, reached through the rebased table.
 			EXPECT_EQ(points.updateSlot, 0x44 / sizeof(void*));
 			EXPECT_EQ(rva(image, points.backendTable[points.updateSlot]), 0xB84B9u);
+			// The server browser's points, which listing the game does without.
+			ASSERT_EQ(points.missingBrowserPoints(), std::vector<std::string_view>{});
+			EXPECT_EQ(rva(image, points.settingsToParams), 0xE1234u);
+			EXPECT_EQ(rva(image, points.mapList), 0xDC1534u);
+			EXPECT_EQ(rva(image, points.mapEntry), 0x08FD1Au);
+			EXPECT_EQ(points.currentMapField, 0x1Cu);
 		}
 
 		TEST(DedicatedServer, LocatesTheGameServerNetworkingInTheClientExecutable)

@@ -43,6 +43,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="browser_attributes_tests.cpp" />
+    <ClCompile Include="..\src\platform\browser_attributes.cpp" />
     <ClCompile Include="config_tests.cpp" />
     <ClCompile Include="dedicated_server_tests.cpp" />
     <ClCompile Include="frame_tests.cpp" />

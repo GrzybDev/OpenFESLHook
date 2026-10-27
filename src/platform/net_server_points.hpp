@@ -14,8 +14,8 @@ namespace openfeslhook::platform
 	/// was not found.
 	struct NetServerPoints
 	{
-		/// The primary virtual-function table of the game server, whose per-frame update the 1.42 server build handles
-		/// its network from.
+		/// The primary virtual-function table of the game server, whose per-frame update the hook handles its network
+		/// from.
 		const void* const* gameServerTable = nullptr;
 
 		/// The game server's handling of its network: new connections, lost ones and the players' packets.

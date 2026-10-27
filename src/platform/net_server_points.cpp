@@ -34,9 +34,9 @@ namespace openfeslhook::platform
 			"56 8B F1 8B 46 1C 8B 4E 18 03 C8 57 F6 C1 03 75 ?? 83 C0 04 C1 E8 02 39 46 14 77 ?? 6A 01 8B CE E8 ?? ?? "
 			"?? ?? 8B 7E 18 03 7E 1C 8B 4E 14 8B C7 C1 E8 02 3B C8 77 02 2B C1 53 8B D8 8B 46 10 C1";
 
-		// The parts of the 1.42 server build's upkeep of the connections. The ping looks its connection up and returns
-		// 5 without one; the queueing of an event stores the event's type at +0x44C; the return of a connection takes
-		// the lock at +0x570 of the slots at +0x574.
+		// The parts of the upkeep of the connections, which the client build keeps. The ping looks its connection up
+		// and returns 5 without one; the queueing of an event stores the event's type at +0x44C; the return of a
+		// connection takes the lock at +0x570 of the slots at +0x574.
 		constexpr std::string_view kPing = "53 56 FF 74 24 0C 8B F1 E8 ?? ?? ?? ?? 8B D8 85 DB 75 08 6A 05 58 E9";
 		constexpr std::string_view kQueueEvent =
 			"56 FF 74 24 08 8B F1 E8 ?? ?? ?? ?? 85 C0 74 ?? 8B 4C 24 0C 89 8E 4C 04 00 00";

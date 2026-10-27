@@ -10,11 +10,11 @@
 namespace openfeslhook::platform
 {
 	/// Where, in the game executable, the parts of taking a joining player in live. When a player's game has connected,
-	/// it sends its player info; the 1.42 server build's GameServer::onPlayerInfo then creates the player and sends the
-	/// server info, after which the game loads the level. The client build reads the info and drops it, and that
-	/// function is gone, but what it was made of is there: most of it in GameServer::addLocalPlayer, which creates the
-	/// local player of Basic Training, the rest in the reading of the info and in code nothing calls any more. A field
-	/// is null when it was not found.
+	/// it sends its player info; GameServer::onPlayerInfo then creates the player and sends the server info, after
+	/// which the game loads the level. The client build reads the info and drops it, and that function is gone, but
+	/// what it was made of is there: most of it in GameServer::addLocalPlayer, which creates the local player of Basic
+	/// Training, the rest in the reading of the info and in code nothing calls any more. A field is null when it was
+	/// not found.
 	struct PlayerEntryPoints
 	{
 		/// Where the game server's part that GameServer::addLocalPlayer and the connection calls belong to begins,

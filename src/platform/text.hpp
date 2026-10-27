@@ -1,7 +1,9 @@
 #pragma once
 
+#include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace openfeslhook::platform
 {
@@ -17,4 +19,12 @@ namespace openfeslhook::platform
 	/// UTF-8 without one, or else text in the system's code page.
 	/// @param bytes The file's contents.
 	[[nodiscard]] std::string decodeText(std::string_view bytes);
+
+	/// Joins names into one list separated by commas, as the hook's messages name the parts they are about.
+	/// @param names The names.
+	[[nodiscard]] std::string joinNames(std::span<const std::string_view> names);
+
+	/// Splits a command line into its arguments as Windows programs read them, the program's path first.
+	/// @param commandLine The command line; an empty one has no arguments.
+	[[nodiscard]] std::vector<std::wstring> splitCommandLine(const std::wstring& commandLine);
 }
