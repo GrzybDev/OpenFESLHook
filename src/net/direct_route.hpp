@@ -39,6 +39,11 @@ namespace openfeslhook::net
 		auto operator<=>(const Target&) const = default;
 	};
 
+	/// Fills in the port of a server given without one.
+	/// @param forward The server, if any.
+	/// @param port The port the game asked for, which a server given with port 0 takes.
+	[[nodiscard]] std::optional<Target> withPort(std::optional<Target> forward, std::uint16_t port);
+
 	/// A route straight to a server that speaks the game's own protocol: each game connection gets a TCP connection,
 	/// encrypted if the target asks for it, or for datagrams a UDP socket of its own to the server, which carries the
 	/// game's packets as they are.

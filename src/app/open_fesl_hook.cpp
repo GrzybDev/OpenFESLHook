@@ -3,13 +3,16 @@
 
 #include "app/log_output.hpp"
 #include "app/settings.hpp"
+#include "http/destination.hpp"
 #include "http/masking.hpp"
+#include "http/web_page.hpp"
 #include "launcher/launcher.hpp"
 #include "logging/log.hpp"
 #include "net/local_services.hpp"
 #include "platform/dedicated_server.hpp"
 #include "platform/host_redirect.hpp"
 #include "platform/ipv4_look_ups.hpp"
+#include "platform/shell_redirect.hpp"
 #include "platform/text.hpp"
 #include "platform/winhttp.hpp"
 #include "platform/winhttp_forwarder.hpp"
@@ -41,20 +44,6 @@ namespace openfeslhook::app
 			                   target.transport == net::Transport::TlsUntrusted ? " with any certificate" : "");
 		}
 
-		platform::HttpDestination destination(const relay::ServerAddress& server,
-		                                      const std::optional<net::Target>& forward)
-		{
-			if (!forward)
-				return {.secure = server.secure, .host = server.host, .port = server.port};
-
-			return {
-				.secure = forward->transport != net::Transport::Plain,
-				.host = forward->host,
-				.port = forward->port,
-				.verifyCertificates = forward->transport == net::Transport::Tls,
-			};
-		}
-
 		net::LocalServices* startServices(const relay::ServerAddress& server, relay::Ipv4Preference& ipv4)
 		{
 			const std::wstring userAgent = platform::widen(std::format("OpenFESLHook/{} (Windows)", kVersion));
@@ -72,7 +61,7 @@ namespace openfeslhook::app
 				},
 				[session, server, &ipv4](const std::optional<net::Target>& forward)
 				{
-					return std::make_shared<platform::WinHttpForwarder>(session, destination(server, forward), ipv4);
+					return std::make_shared<platform::WinHttpForwarder>(session, http::destinationOf(server, forward), ipv4);
 				});
 		}
 
@@ -187,6 +176,23 @@ namespace openfeslhook::app
 					                                problem.what()));
 					log::warning(log::Topic::Hook, "{}", problems.back());
 				}
+			}
+
+			// The game opens some pages of its website in the system's browser, whose look-ups no detour here sees.
+			try
+			{
+				if (platform::installShellRedirect([hosts = settings.hosts, forwards = settings.forwards,
+				                                    server = settings.server](const std::string_view url)
+				    {
+					    return http::pageAddress(url, hosts, forwards, server);
+				    }))
+					log::debug(log::Topic::Http, "The pages the game opens in the browser open on the hook's servers");
+			}
+			catch (const std::exception& problem)
+			{
+				problems.push_back(std::format("{}; pages the game opens in the browser go to their original sites",
+				                               problem.what()));
+				log::warning(log::Topic::Hook, "{}", problems.back());
 			}
 		}
 		catch (const std::exception& problem)

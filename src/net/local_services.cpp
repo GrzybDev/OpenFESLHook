@@ -11,16 +11,6 @@
 
 namespace openfeslhook::net
 {
-	namespace
-	{
-		std::optional<Target> withPort(std::optional<Target> forward, const std::uint16_t port)
-		{
-			if (forward && forward->port == 0)
-				forward->port = port;
-			return forward;
-		}
-	}
-
 	LocalServices::LocalServices(relay::UpstreamFactory upstream, HttpForwarders http)
 		: work_(io_.get_executor()),
 		  session_(std::make_shared<relay::Session>(io_.get_executor(), std::move(upstream))), http_(std::move(http)),

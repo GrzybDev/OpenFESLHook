@@ -361,6 +361,13 @@ namespace openfeslhook::net
 		}
 	};
 
+	std::optional<Target> withPort(std::optional<Target> forward, const std::uint16_t port)
+	{
+		if (forward && forward->port == 0)
+			forward->port = port;
+		return forward;
+	}
+
 	DirectRoute::DirectRoute(boost::asio::io_context& io, Target target)
 		: io_(io), target_(std::move(target)), to_(std::format("to {}:{}", target_.host, target_.port))
 	{

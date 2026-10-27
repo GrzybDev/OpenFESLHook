@@ -75,6 +75,7 @@
     <ClInclude Include="src\platform\server_manager.hpp" />
     <ClInclude Include="src\platform\server_manager_points.hpp" />
     <ClInclude Include="src\platform\server_patch_points.hpp" />
+    <ClInclude Include="src\platform\shell_redirect.hpp" />
     <ClInclude Include="src\platform\text.hpp" />
     <ClInclude Include="src\platform\winhttp.hpp" />
     <ClInclude Include="src\platform\winhttp_forwarder.hpp" />
@@ -109,6 +110,7 @@
     <ClCompile Include="src\platform\server_manager.cpp" />
     <ClCompile Include="src\platform\server_manager_points.cpp" />
     <ClCompile Include="src\platform\server_patch_points.cpp" />
+    <ClCompile Include="src\platform\shell_redirect.cpp" />
     <ClCompile Include="src\platform\text.cpp" />
     <ClCompile Include="src\platform\winhttp.cpp" />
     <ClCompile Include="src\platform\winhttp_forwarder.cpp" />

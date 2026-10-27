@@ -53,7 +53,7 @@ namespace openfeslhook::platform
 		}
 	}
 
-	WinHttpForwarder::WinHttpForwarder(HINTERNET session, HttpDestination destination, relay::Ipv4Preference& ipv4)
+	WinHttpForwarder::WinHttpForwarder(HINTERNET session, http::Destination destination, relay::Ipv4Preference& ipv4)
 		: session_(session), destination_(std::move(destination)), ipv4_(ipv4)
 	{
 		if (!destination_.secure)

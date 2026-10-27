@@ -202,7 +202,16 @@ namespace openfeslhook::launcher
 			}
 			else
 			{
-				arguments = {L"+sessionId", session};
+				// The game opens its website's pages only on a host from its own list, and with +survey 1 it opens a
+				// survey page once it quits.
+				arguments = {L"+sessionId",
+				             session,
+				             L"+webSiteHostName",
+				             L"www.battlefieldheroes.com",
+				             L"+battleFundsHostName",
+				             L"www.battlefieldheroes.com",
+				             L"+survey",
+				             L"0"};
 			}
 
 			const std::string language = choice.language.empty() ? systemLanguage() : choice.language;
