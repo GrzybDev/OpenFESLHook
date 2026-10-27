@@ -13,6 +13,7 @@
 
 #include "fesl/packet.hpp"
 #include "relay/frame.hpp"
+#include "relay/presence.hpp"
 #include "relay/route.hpp"
 #include "relay/upstream.hpp"
 
@@ -27,7 +28,10 @@ namespace openfeslhook::relay
 		/// refused while none is open, and the connection to the relay server closes with the last one.
 		/// @param executor Where the relay server's events are handled.
 		/// @param connect Makes a new connection to the relay server whenever the session needs one.
-		Session(boost::asio::any_io_executor executor, UpstreamFactory connect);
+		/// @param presence Where the relay server's presence for Discord goes; with one, each connection to the relay
+		/// server asks for presence, and the presence is cleared when the connection ends.
+		Session(boost::asio::any_io_executor executor, UpstreamFactory connect,
+		        std::shared_ptr<PresenceSink> presence = nullptr);
 
 		[[nodiscard]] std::optional<std::uint16_t> attach(Channel channel, const OpenBody& ports,
 		                                                  std::weak_ptr<Endpoint> endpoint) override;
@@ -50,6 +54,7 @@ namespace openfeslhook::relay
 
 		boost::asio::any_io_executor executor_;
 		UpstreamFactory connect_;
+		std::shared_ptr<PresenceSink> presence_;
 		std::unique_ptr<Upstream> upstream_;
 		// Tells the events of an upstream that was closed since from those of the current one.
 		std::uint64_t generation_ = 0;

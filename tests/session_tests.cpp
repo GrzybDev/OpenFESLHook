@@ -28,6 +28,23 @@ namespace openfeslhook::test
 			}
 		};
 
+		class RecordingPresence final : public relay::PresenceSink
+		{
+		public:
+			std::vector<std::string> shown;
+			int cleared = 0;
+
+			void show(const std::string_view json) override
+			{
+				shown.emplace_back(json);
+			}
+
+			void clear() override
+			{
+				++cleared;
+			}
+		};
+
 		struct Fixture
 		{
 			boost::asio::io_context io;
@@ -101,6 +118,38 @@ namespace openfeslhook::test
 		EXPECT_EQ(game->delivered, std::vector<fesl::Packet>{reply});
 		EXPECT_TRUE(game->closed);
 		EXPECT_TRUE(fixture.server.closed(0));
+	}
+
+	TEST(RelaySession, AsksEachRelayConnectionForPresenceAndClearsItWhenTheConnectionEnds)
+	{
+		boost::asio::io_context io;
+		FakeRelayServer server;
+		const auto presence = std::make_shared<RecordingPresence>();
+		const auto session = std::make_shared<relay::Session>(io.get_executor(), server.factory(), presence);
+		const auto game = std::make_shared<RecordingEndpoint>();
+		const relay::OpenBody ports{.listenPort = 18390, .gamePort = 50008};
+		const relay::Frame request = relay::presenceFrame(R"({"enabled":true})");
+		const std::string playing = R"({"application":"1234567890","activity":{"name":"Sample Game"}})";
+
+		const std::optional<std::uint16_t> connection = session->attach(relay::Channel::Fesl, ports, game);
+		ASSERT_TRUE(connection);
+		server.accept(0);
+		server.send(0, relay::presenceFrame(playing));
+		io.poll();
+
+		EXPECT_EQ(server.frames(0), (std::vector{request, relay::openFrame(relay::Channel::Fesl, *connection, ports)}));
+		EXPECT_EQ(presence->shown, std::vector{playing});
+		EXPECT_EQ(presence->cleared, 0);
+		EXPECT_FALSE(game->closed);
+
+		server.drop(0, "the server restarted");
+		io.restart();
+		io.poll();
+		EXPECT_EQ(presence->cleared, 1);
+
+		ASSERT_TRUE(session->attach(relay::Channel::Fesl, ports, game));
+		ASSERT_EQ(server.connections(), 2u);
+		EXPECT_EQ(server.frames(1).front(), request);
 	}
 
 	TEST(RelaySession, OpensDatagramPeersOnlyAlongATcpConnection)

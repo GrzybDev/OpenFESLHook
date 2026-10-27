@@ -64,6 +64,7 @@
     <ClInclude Include="src\pch.hpp" />
     <ClInclude Include="src\relay\frame.hpp" />
     <ClInclude Include="src\relay\ipv4_preference.hpp" />
+    <ClInclude Include="src\relay\presence.hpp" />
     <ClInclude Include="src\relay\route.hpp" />
     <ClInclude Include="src\relay\server_address.hpp" />
     <ClInclude Include="src\relay\session.hpp" />

@@ -16,12 +16,14 @@ namespace openfeslhook::relay
 
 		bool isKnown(const FrameType type)
 		{
-			return type == FrameType::Open || type == FrameType::Data || type == FrameType::Close;
+			return type == FrameType::Open || type == FrameType::Data || type == FrameType::Close ||
+			       type == FrameType::Presence;
 		}
 
 		bool isKnown(const Channel channel)
 		{
-			return channel == Channel::Fesl || channel == Channel::Theater || channel == Channel::TheaterDatagram;
+			return channel == Channel::Session || channel == Channel::Fesl || channel == Channel::Theater ||
+			       channel == Channel::TheaterDatagram;
 		}
 
 		void checkBody(const Frame& frame)
@@ -40,6 +42,11 @@ namespace openfeslhook::relay
 			case FrameType::Close:
 				if (!frame.body.empty())
 					throw std::runtime_error(std::format("a Close frame has a {}-byte body", frame.body.size()));
+				break;
+			case FrameType::Presence:
+				if (frame.connection != 0 || frame.body.empty())
+					throw std::runtime_error(std::format("a Presence frame for connection {} has a {}-byte body",
+					                                     frame.connection, frame.body.size()));
 				break;
 			}
 		}
@@ -64,6 +71,11 @@ namespace openfeslhook::relay
 	Frame closeFrame(const Channel channel, const std::uint16_t connection)
 	{
 		return {.type = FrameType::Close, .channel = channel, .connection = connection};
+	}
+
+	Frame presenceFrame(const std::string_view json)
+	{
+		return {.type = FrameType::Presence, .channel = Channel::Session, .body = {json.begin(), json.end()}};
 	}
 
 	std::vector<std::uint8_t> encode(const Frame& frame)
@@ -92,6 +104,8 @@ namespace openfeslhook::relay
 			throw std::runtime_error(std::format("a frame has the unknown type {}", message[0]));
 		if (!isKnown(frame.channel))
 			throw std::runtime_error(std::format("a frame has the unknown channel {}", message[1]));
+		if ((frame.type == FrameType::Presence) != (frame.channel == Channel::Session))
+			throw std::runtime_error(std::format("a frame of type {} has the channel {}", message[0], message[1]));
 
 		checkBody(frame);
 		return frame;
@@ -101,6 +115,8 @@ namespace openfeslhook::relay
 	{
 		switch (channel)
 		{
+		case Channel::Session:
+			return "session";
 		case Channel::Fesl:
 			return "FESL";
 		case Channel::Theater:

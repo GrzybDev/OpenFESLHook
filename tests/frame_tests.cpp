@@ -26,6 +26,12 @@ namespace openfeslhook::test
 		EXPECT_EQ(relay::encode(relay::closeFrame(relay::Channel::TheaterDatagram, 9)),
 		          (std::vector<std::uint8_t>{3, 3, 0, 9}));
 		EXPECT_EQ(relay::decode(data), relay::dataFrame(relay::Channel::Theater, 7, packet));
+
+		const std::string_view json = R"({"activity":null})";
+		std::vector<std::uint8_t> presence{4, 0, 0, 0};
+		presence.insert(presence.end(), json.begin(), json.end());
+		EXPECT_EQ(relay::encode(relay::presenceFrame(json)), presence);
+		EXPECT_EQ(relay::decode(presence), relay::presenceFrame(json));
 	}
 
 	TEST(RelayFrame, RejectsMessagesOutsideTheProtocol)
@@ -42,6 +48,10 @@ namespace openfeslhook::test
 			{1, 1, 0, 1, 0x47},
 			{1, 1, 0, 1, 0x47, 0xd6, 0xc3, 0x50, 3, 'a'},
 			partialPacket,
+			{4, 1, 0, 0, '{', '}'},
+			{4, 0, 0, 1, '{', '}'},
+			{4, 0, 0, 0},
+			{3, 0, 0, 1},
 		};
 		for (const std::vector<std::uint8_t>& message : messages)
 			EXPECT_THROW((void)relay::decode(message), std::runtime_error);

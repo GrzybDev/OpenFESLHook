@@ -7,14 +7,17 @@ namespace openfeslhook::relay
 {
 	namespace
 	{
+		constexpr std::string_view kPresenceRequest = R"({"enabled":true})";
+
 		bool isStream(const Channel channel)
 		{
 			return channel != Channel::TheaterDatagram;
 		}
 	}
 
-	Session::Session(boost::asio::any_io_executor executor, UpstreamFactory connect)
-		: executor_(std::move(executor)), connect_(std::move(connect))
+	Session::Session(boost::asio::any_io_executor executor, UpstreamFactory connect,
+	                 std::shared_ptr<PresenceSink> presence)
+		: executor_(std::move(executor)), connect_(std::move(connect)), presence_(std::move(presence))
 	{
 	}
 
@@ -128,6 +131,8 @@ namespace openfeslhook::relay
 			},
 		});
 		upstream_ = std::move(upstream);
+		if (presence_)
+			send(presenceFrame(kPresenceRequest));
 	}
 
 	void Session::send(const Frame& frame)
@@ -153,6 +158,15 @@ namespace openfeslhook::relay
 			log::error(log::Topic::Relay, "The relay server sent a message outside {}: {}", kSubprotocol,
 			           problem.what());
 			end("the relay server broke the protocol");
+			return;
+		}
+
+		if (frame.type == FrameType::Presence)
+		{
+			if (presence_)
+				presence_->show({reinterpret_cast<const char*>(frame.body.data()), frame.body.size()});
+			else
+				log::debug(log::Topic::Relay, "The relay server sent presence, which the hook did not ask for");
 			return;
 		}
 
@@ -198,6 +212,8 @@ namespace openfeslhook::relay
 		log::info(log::Topic::Relay, "The relay session ended: {}", reason);
 		++generation_;
 		relayToken_->store(nullptr);
+		if (presence_)
+			presence_->clear();
 		if (upstream_)
 		{
 			upstream_->close();

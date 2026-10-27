@@ -25,11 +25,16 @@ namespace openfeslhook::relay
 		Data = 2,
 		/// The connection ended, or is to be ended when the relay server sends it.
 		Close = 3,
+		/// What Discord shows for the game, as UTF-8 JSON on the session channel: the hook asks for it once per
+		/// connection to the relay server, which then sends it whenever it changes.
+		Presence = 4,
 	};
 
 	/// The game service a connection belongs to.
 	enum class Channel : std::uint8_t
 	{
+		/// No game connection: frames about the session as a whole, which carry connection 0.
+		Session = 0,
 		Fesl = 1,
 		Theater = 2,
 		TheaterDatagram = 3,
@@ -78,6 +83,10 @@ namespace openfeslhook::relay
 	/// @param channel The connection's service.
 	/// @param connection The connection's number.
 	[[nodiscard]] Frame closeFrame(Channel channel, std::uint16_t connection);
+
+	/// Builds the frame that carries presence for Discord.
+	/// @param json The presence as UTF-8 JSON.
+	[[nodiscard]] Frame presenceFrame(std::string_view json);
 
 	/// Lays a frame out as the bytes of a WebSocket message, numbers big-endian.
 	/// @param frame The frame.
