@@ -16,7 +16,7 @@ namespace openfeslhook::platform
 	/// detour of ws2_32!connect, so that a listener can start on the port the game asks for; the detours stay for as
 	/// long as the process runs.
 	/// @param hosts The protocol each configured host or domain speaks.
-	/// @param blockUnknownHosts Whether gethostbyname's look-ups of other host names fail.
+	/// @param blockUnknownHosts Whether gethostbyname's look-ups of other host names than the PC's own fail.
 	/// @param connecting Called for each connection to a redirected host.
 	/// @throws std::runtime_error When the detours cannot be installed.
 	/// @throws std::logic_error When the redirect is already installed.

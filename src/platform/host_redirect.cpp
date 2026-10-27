@@ -91,6 +91,27 @@ namespace openfeslhook::platform
 			return address;
 		}
 
+		// Games look the PC's own names up for its addresses, such as to open an admin port. Its computer name is
+		// looked up as its host name: Windows cuts the computer name to 15 characters, which DNS does not know where
+		// Windows' own name resolution is missing, as under Wine in a container named by a long id, while Wine
+		// answers its host name with the PC's addresses itself.
+		std::optional<std::string> ownName(const std::string_view name)
+		{
+			const std::string normal = util::normalHostName(name);
+			if (normal == "localhost")
+				return normal;
+
+			std::array<char, 256> host{};
+			if (gethostname(host.data(), static_cast<int>(host.size())) != 0)
+				return std::nullopt;
+			std::array<char, MAX_COMPUTERNAME_LENGTH + 1> computer{};
+			auto size = static_cast<DWORD>(computer.size());
+			if (normal == util::normalHostName(host.data()) ||
+			    (GetComputerNameA(computer.data(), &size) && normal == util::normalHostName({computer.data(), size})))
+				return std::string(host.data());
+			return std::nullopt;
+		}
+
 		// The game's own calls must never see an exception, so whatever the hook cannot do is logged instead.
 		hostent* WSAAPI lookUp(const char* name) noexcept
 		{
@@ -102,6 +123,13 @@ namespace openfeslhook::platform
 
 				if (const std::optional<std::uint32_t> address = redirect(name))
 					return answer(name, *address);
+
+				if (const std::optional<std::string> own = ownName(name))
+				{
+					log::write(levelOfLookUp(name), log::Topic::Dns, "{} names this PC and is looked up as {}", name,
+					           *own);
+					return gRedirect->originalGetHostByName(own->c_str());
+				}
 
 				if (gRedirect->blockUnknownHosts)
 				{

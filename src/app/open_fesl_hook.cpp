@@ -169,7 +169,7 @@ namespace openfeslhook::app
 				log::debug(log::Topic::Hook, "[Forward] {}={}", host, describe(target));
 			log::info(log::Topic::Dns,
 			          "Look-ups of {} host name(s) and domain(s) lead to this PC; gethostbyname's look-ups of other hosts "
-			          "{}, and getaddrinfo's go to the system's resolver",
+			          "than this PC's own names {}, and getaddrinfo's go to the system's resolver",
 			          settings.hosts.entries().size(),
 			          settings.blockUnknownHosts ? "fail" : "go to the system's resolver");
 

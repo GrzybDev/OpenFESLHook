@@ -1,5 +1,9 @@
+// The games call gethostbyname, which Windows marks deprecated, so the tests call it as they do.
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
 #include <gtest/gtest.h>
 
+#include <array>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -27,7 +31,7 @@ namespace openfeslhook::test
 
 		// The detours stay for as long as the test process runs, so they are installed once and report into storage
 		// that outlives each test; the domain is one no other test looks up, and other names go on to the system
-		// resolver.
+		// resolver through getaddrinfo, which is how the other tests look up.
 		Connections& redirectOnce()
 		{
 			static Connections connections;
@@ -36,7 +40,7 @@ namespace openfeslhook::test
 			{
 				config::HostMap<net::Protocol> hosts;
 				hosts.add("*.redirect.test", net::Protocol::Http);
-				platform::installHostRedirect(std::move(hosts), false,
+				platform::installHostRedirect(std::move(hosts), true,
 				                              [](const std::string_view host, const net::Service& service)
 				{
 					const std::scoped_lock lock(connections.mutex);
@@ -86,5 +90,26 @@ namespace openfeslhook::test
 		ASSERT_EQ(getaddrinfo("127.0.0.1", "80", &hints, &found), 0);
 		EXPECT_EQ(addressOf(*found), INADDR_LOOPBACK);
 		freeaddrinfo(found);
+	}
+
+	// The Bad Company 2 dedicated server looks its computer name up to open its admin port and stops when that fails.
+	TEST(HostRedirect, LooksUpThePcsOwnNamesWhileRefusingUnknownHosts)
+	{
+		redirectOnce();
+
+		std::array<char, MAX_COMPUTERNAME_LENGTH + 1> computer{};
+		auto size = static_cast<DWORD>(computer.size());
+		ASSERT_TRUE(GetComputerNameA(computer.data(), &size));
+		std::array<char, 256> host{};
+		ASSERT_EQ(gethostname(host.data(), static_cast<int>(host.size())), 0);
+		for (const char* own : {computer.data(), host.data()})
+			EXPECT_NE(gethostbyname(own), nullptr) << own;
+
+		const hostent* local = gethostbyname("LocalHost");
+		ASSERT_NE(local, nullptr);
+		EXPECT_EQ(ntohl(reinterpret_cast<const in_addr*>(local->h_addr_list[0])->s_addr), INADDR_LOOPBACK);
+
+		EXPECT_EQ(gethostbyname("unknown.example.com"), nullptr);
+		EXPECT_EQ(WSAGetLastError(), WSAHOST_NOT_FOUND);
 	}
 }
