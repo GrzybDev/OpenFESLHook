@@ -6,6 +6,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "logging/log.hpp"
@@ -20,6 +21,7 @@ namespace openfeslhook::platform
 		// Kept for as long as the detours, which is as long as the process runs.
 		config::HostMap<net::Protocol>* gHosts = nullptr;
 		std::wstring gProxy;
+		decltype(&WinHttpOpen) gOpen = nullptr;
 		decltype(&WinHttpConnect) gConnect = nullptr;
 		decltype(&WinHttpOpenRequest) gOpenRequest = nullptr;
 		decltype(&WinHttpCloseHandle) gCloseHandle = nullptr;
@@ -42,6 +44,15 @@ namespace openfeslhook::platform
 			{
 				return false;
 			}
+		}
+
+		// Wine accepts WINHTTP_OPTION_PROXY on a request and ignores it, so there a game's session gets the proxy when it
+		// opens. The hook's own sessions, named by their user agent, keep going straight to their servers.
+		HINTERNET WINAPI open(LPCWSTR userAgent, DWORD accessType, LPCWSTR proxy, LPCWSTR bypass, DWORD flags) noexcept
+		{
+			if (userAgent != nullptr && std::wstring_view(userAgent).starts_with(L"OpenFESLHook/"))
+				return gOpen(userAgent, accessType, proxy, bypass, flags);
+			return gOpen(userAgent, WINHTTP_ACCESS_TYPE_NAMED_PROXY, gProxy.c_str(), WINHTTP_NO_PROXY_BYPASS, flags);
 		}
 
 		// The game's own calls must never see an exception, so the handle is handed back whatever the hook does with it.
@@ -111,6 +122,8 @@ namespace openfeslhook::platform
 	{
 		gHosts = new config::HostMap<net::Protocol>(std::move(hosts));
 		gProxy = widen(proxyEndpoint);
+		if (GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "wine_get_version") != nullptr)
+			detour<decltype(&WinHttpOpen)>(L"winhttp", "WinHttpOpen", open, gOpen);
 		detour<decltype(&WinHttpConnect)>(L"winhttp", "WinHttpConnect", connect, gConnect);
 		detour<decltype(&WinHttpOpenRequest)>(L"winhttp", "WinHttpOpenRequest", openRequest, gOpenRequest);
 		detour<decltype(&WinHttpCloseHandle)>(L"winhttp", "WinHttpCloseHandle", closeHandle, gCloseHandle);
