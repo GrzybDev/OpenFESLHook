@@ -55,3 +55,20 @@ jobs:
       ref: ${{ needs.version.outputs.ref }}
       platform: x86
       library: dinput8.dll
+
+  # The DLL links Boost, OpenSSL and MinHook statically, so their licence texts travel with it.
+  notices:
+    name: Attach the third-party notices
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: THIRD-PARTY-NOTICES.md
+          tag_name: v${{ needs.version.outputs.version }}
