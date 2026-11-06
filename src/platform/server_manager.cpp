@@ -2,10 +2,12 @@
 #include "platform/server_manager.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -18,6 +20,7 @@
 #include "logging/log.hpp"
 #include "platform/browser_attributes.hpp"
 #include "platform/game_objects.hpp"
+#include "platform/module_path.hpp"
 #include "platform/player_entry.hpp"
 #include "platform/server_identity.hpp"
 #include "platform/server_manager_points.hpp"
@@ -297,12 +300,31 @@ namespace openfeslhook::platform
 			}
 		}
 
+		// The game runs ServerSettings.con only after its game manager starts to listen, so sv.serverPort still holds
+		// the default then and the file names the port.
+		std::optional<std::uint16_t> configuredPort()
+		{
+			constexpr std::string_view key = "sv.serverPort ";
+			std::ifstream file(modulePath(nullptr).parent_path() / L"mods" / L"bfheroes" / L"Settings" /
+			                   L"ServerSettings.con");
+			for (std::string line; std::getline(file, line);)
+			{
+				std::uint16_t port = 0;
+				const char* const first = line.data() + key.size();
+				if (line.starts_with(key) && std::from_chars(first, line.data() + line.size(), port).ec == std::errc{})
+					return port;
+			}
+			return std::nullopt;
+		}
+
 		// The game manager listens on the server's own port (sv.serverPort), the one the game is listed with and
 		// players reach, which GameManager.con calls the dedicated server's game port; the client build asks for
 		// none, so the system would pick one.
 		void __fastcall listenDetour(void* manager, void* /*edx*/, std::uint32_t port)
 		{
-			if (const std::uint8_t* const settings = serverSettings())
+			if (const std::optional<std::uint16_t> configured = configuredPort())
+				port = *configured;
+			else if (const std::uint8_t* const settings = serverSettings())
 				port = static_cast<std::uint16_t>(read<std::int32_t>(settings + kServerPort));
 			originalListen(manager, port);
 		}
