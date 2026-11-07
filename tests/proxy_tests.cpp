@@ -76,6 +76,41 @@ namespace openfeslhook::test
 			beast::http::read(socket, buffer, response);
 			return response.body();
 		}
+
+		// The game's WinHTTP opens an HTTPS request through the proxy with CONNECT, then does TLS inside the tunnel.
+		std::string tunnelledGet(const std::uint16_t proxyPort, const std::string_view target)
+		{
+			boost::asio::io_context io;
+			tcp::socket socket(io);
+			socket.connect({boost::asio::ip::address_v4::loopback(), proxyPort});
+			beast::http::request<beast::http::empty_body> tunnel(beast::http::verb::connect,
+			                                                     "www.battlefieldheroes.com:443", 11);
+			tunnel.set(beast::http::field::host, "www.battlefieldheroes.com:443");
+			beast::http::write(socket, tunnel);
+
+			beast::flat_buffer buffer;
+			beast::http::response_parser<beast::http::empty_body> established;
+			beast::http::read_header(socket, buffer, established);
+			EXPECT_EQ(established.get().result(), beast::http::status::ok);
+
+			// The game turns its own certificate checks off for these requests, so a client that verifies nothing
+			// stands in; like the game's WinHTTP, it offers TLS 1.2 or later only.
+			ssl::context client(ssl::context::tls_client);
+			client.set_options(ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
+			client.set_verify_mode(ssl::verify_none);
+			ssl::stream<tcp::socket&> tls(socket, client);
+			tls.handshake(ssl::stream_base::client);
+
+			http::Request request(beast::http::verb::get, target, 11);
+			request.set(beast::http::field::host, "www.battlefieldheroes.com");
+			request.keep_alive(false);
+			beast::http::write(tls, request);
+
+			beast::flat_buffer responseBuffer;
+			http::Response response;
+			beast::http::read(tls, responseBuffer, response);
+			return response.body();
+		}
 	}
 
 	TEST(WinHttpProxy, ForwardsAPlainProxyRequestByItsPath)
@@ -144,42 +179,25 @@ namespace openfeslhook::test
 		                            [&](const std::optional<net::Target>&, const auto&) { return forwarder; });
 		const std::uint16_t port = startProxyWith(services);
 
-		boost::asio::io_context io;
-		tcp::socket socket(io);
-		socket.connect({boost::asio::ip::address_v4::loopback(), port});
-
-		// The game's WinHTTP opens an HTTPS request through the proxy with CONNECT, then does TLS inside the tunnel.
-		beast::http::request<beast::http::empty_body> tunnel(beast::http::verb::connect,
-		                                                     "www.battlefieldheroes.com:443", 11);
-		tunnel.set(beast::http::field::host, "www.battlefieldheroes.com:443");
-		beast::http::write(socket, tunnel);
-
-		beast::flat_buffer buffer;
-		beast::http::response_parser<beast::http::empty_body> established;
-		beast::http::read_header(socket, buffer, established);
-		ASSERT_EQ(established.get().result(), beast::http::status::ok);
-
-		// The game turns its own certificate checks off for these requests, so a client that verifies nothing stands in;
-		// like the game's WinHTTP, it offers TLS 1.2 or later only.
-		ssl::context client(ssl::context::tls_client);
-		client.set_options(ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
-		client.set_verify_mode(ssl::verify_none);
-		ssl::stream<tcp::socket&> tls(socket, client);
-		tls.handshake(ssl::stream_base::client);
-
-		http::Request request(beast::http::verb::get, "/nucleus/authToken", 11);
-		request.set(beast::http::field::host, "www.battlefieldheroes.com");
-		request.keep_alive(false);
-		beast::http::write(tls, request);
-
-		beast::flat_buffer responseBuffer;
-		http::Response response;
-		beast::http::read(tls, responseBuffer, response);
-
-		EXPECT_EQ(response.body(), "795745");
+		EXPECT_EQ(tunnelledGet(port, "/nucleus/authToken"), "795745");
 		const std::vector<http::Request> forwarded = forwarder->requests();
 		ASSERT_EQ(forwarded.size(), 1u);
 		EXPECT_EQ(forwarded[0].target(), "/nucleus/authToken");
 		EXPECT_EQ(forwarded[0][beast::http::field::host], "www.battlefieldheroes.com");
+	}
+
+	TEST(WinHttpProxy, LeavesAnAddressInTheQueryOfARequestsPathAlone)
+	{
+		FakeRelayServer server;
+		const auto forwarder = std::make_shared<RecordingForwarder>();
+		net::LocalServices services(server.factory(),
+		                            [&](const std::optional<net::Target>&, const auto&) { return forwarder; });
+		const std::uint16_t port = startProxyWith(services);
+
+		const std::string_view target = "/en/login?return=http://www.battlefieldheroes.com/en/store";
+		EXPECT_EQ(tunnelledGet(port, target), "795745");
+		const std::vector<http::Request> forwarded = forwarder->requests();
+		ASSERT_EQ(forwarded.size(), 1u);
+		EXPECT_EQ(forwarded[0].target(), target);
 	}
 }

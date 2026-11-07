@@ -41,7 +41,7 @@ namespace openfeslhook::net
 		{
 			const std::string target(request.target());
 			const std::size_t scheme = target.find("://");
-			if (scheme == std::string::npos)
+			if (target.starts_with('/') || scheme == std::string::npos)
 				return;
 
 			const std::size_t slash = target.find('/', scheme + 3);
