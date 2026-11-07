@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -23,9 +24,6 @@ namespace openfeslhook::platform
 	/// A mapped module as an image, or an empty image when it cannot be read.
 	/// @param module The module.
 	[[nodiscard]] Image moduleImage(HMODULE module) noexcept;
-
-	/// The process's main module as it is mapped, or an empty image when it cannot be read.
-	[[nodiscard]] Image mainImage() noexcept;
 
 	/// The first place a byte pattern appears in a range, found quickly through its first byte, or nullptr.
 	/// @param start The range's first byte.
@@ -119,11 +117,12 @@ namespace openfeslhook::platform
 	[[nodiscard]] const void* const* findVtable(const Image& image, std::string_view decoratedName,
 	                                            std::uint32_t offset = 0);
 
-	/// Where, in an object of a class, each part with a table of virtual functions begins, in ascending order: 0 for
-	/// the primary table, then one offset per further base part. Empty when the image has no such class.
+	/// The tables of virtual functions of a class, by where in an object the part each belongs to begins: 0 for the
+	/// primary table, then one offset per further base part. Empty when the image has no such class.
 	/// @param image The image.
 	/// @param decoratedName The class's decorated type name.
-	[[nodiscard]] std::vector<std::uint32_t> vtableOffsets(const Image& image, std::string_view decoratedName);
+	[[nodiscard]] std::map<std::uint32_t, const void* const*> vtables(const Image& image,
+	                                                                  std::string_view decoratedName);
 
 	/// The slot of a table of virtual functions whose function begins with a signature, or nothing when no slot or
 	/// more than one does. The table ends at the first entry that does not point into the code.

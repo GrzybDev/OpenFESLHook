@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include <windows.h>
+#include "platform/game_objects.hpp"
 
 namespace openfeslhook::platform
 {
@@ -46,43 +47,10 @@ namespace openfeslhook::platform
 			return signature.length > 0 && signature.bytes[0] >= 0;
 		}
 
-		std::uint32_t readDword(const std::uint8_t* at) noexcept
-		{
-			std::uint32_t value = 0;
-			std::memcpy(&value, at, sizeof value);
-			return value;
-		}
-
-		// Calls visit(offset, table) for each table of virtual functions of a class, found through its complete object
-		// locators: a zero signature, the table's offset within the object, the constructor displacement's offset,
-		// then the type descriptor, which holds a vtable pointer and a spare pointer before the decorated name. The
-		// word before a table points to its locator. Stops when visit returns true.
-		template <typename Visit>
-		void forEachVtable(const Image& image, const std::string_view decoratedName, Visit visit)
-		{
-			const std::uint8_t* const name = findString(image, decoratedName);
-			if (name == nullptr || name - image.base < 8)
-				return;
-			const auto descriptor = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(name - 8));
-			for (const std::uint8_t* reference : findAllBytes(image.base, image.size, &descriptor, sizeof descriptor))
-			{
-				if (reference - image.base < 12)
-					continue;
-				const std::uint8_t* const locator = reference - 12;
-				if (readDword(locator) != 0)
-					continue;
-				const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(locator));
-				if (const std::uint8_t* const slot = findBytes(image.base, image.size, &address, sizeof address))
-					if (visit(readDword(locator + 4), reinterpret_cast<const void* const*>(slot + 4)))
-						return;
-			}
-		}
-
 		std::array<std::uint8_t, 5> pushOf(const std::uint8_t* target) noexcept
 		{
 			std::array<std::uint8_t, 5> instruction{0x68};
-			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(target));
-			std::memcpy(instruction.data() + 1, &address, 4);
+			write(instruction.data() + 1, static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(target)));
 			return instruction;
 		}
 	}
@@ -107,11 +75,6 @@ namespace openfeslhook::platform
 				image.textSize = sections[i].Misc.VirtualSize;
 			}
 		return image;
-	}
-
-	Image mainImage() noexcept
-	{
-		return moduleImage(GetModuleHandleW(nullptr));
 	}
 
 	const std::uint8_t* findBytes(const std::uint8_t* start, const std::size_t size, const void* pattern,
@@ -201,13 +164,8 @@ namespace openfeslhook::platform
 		if (image.text == nullptr)
 			return nullptr;
 		for (std::size_t i = 0; i + 5 <= image.textSize; ++i)
-			if (image.text[i] == 0xE8)
-			{
-				std::int32_t relative = 0;
-				std::memcpy(&relative, image.text + i + 1, 4);
-				if (image.text + i + 5 + relative == target)
-					return image.text + i;
-			}
+			if (image.text[i] == 0xE8 && image.text + i + 5 + read<std::int32_t>(image.text + i + 1) == target)
+				return image.text + i;
 		return nullptr;
 	}
 
@@ -215,9 +173,7 @@ namespace openfeslhook::platform
 	{
 		if (call == nullptr || call < image.text || call + 5 > image.text + image.textSize)
 			return nullptr;
-		std::int32_t relative = 0;
-		std::memcpy(&relative, call + 1, 4);
-		const std::uint8_t* const target = call + 5 + relative;
+		const std::uint8_t* const target = call + 5 + read<std::int32_t>(call + 1);
 		return target >= image.text && target < image.text + image.textSize ? target : nullptr;
 	}
 
@@ -232,9 +188,7 @@ namespace openfeslhook::platform
 	{
 		if (operand == nullptr)
 			return nullptr;
-		std::uint32_t address = 0;
-		std::memcpy(&address, operand, 4);
-		const auto* const global = reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(address));
+		const auto* const global = read<const std::uint8_t*>(operand);
 		if (global < image.base || global + sizeof(void*) > image.base + image.size)
 			return nullptr;
 		return reinterpret_cast<void* const*>(global);
@@ -260,27 +214,35 @@ namespace openfeslhook::platform
 		return nullptr;
 	}
 
-	const void* const* findVtable(const Image& image, const std::string_view decoratedName, const std::uint32_t offset)
+	std::map<std::uint32_t, const void* const*> vtables(const Image& image, const std::string_view decoratedName)
 	{
-		const void* const* found = nullptr;
-		forEachVtable(image, decoratedName, [&](const std::uint32_t at, const void* const* table) {
-			if (at == offset)
-				found = table;
-			return found != nullptr;
-		});
-		return found;
+		// Each table is found through its complete object locator: a zero signature, the table's offset within the
+		// object, the constructor displacement's offset, then the type descriptor, which holds a vtable pointer and a
+		// spare pointer before the decorated name. The word before a table points to its locator.
+		std::map<std::uint32_t, const void* const*> tables;
+		const std::uint8_t* const name = findString(image, decoratedName);
+		if (name == nullptr || name - image.base < 8)
+			return tables;
+		const auto descriptor = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(name - 8));
+		for (const std::uint8_t* reference : findAllBytes(image.base, image.size, &descriptor, sizeof descriptor))
+		{
+			if (reference - image.base < 12)
+				continue;
+			const std::uint8_t* const locator = reference - 12;
+			if (read<std::uint32_t>(locator) != 0)
+				continue;
+			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(locator));
+			if (const std::uint8_t* const slot = findBytes(image.base, image.size, &address, sizeof address))
+				tables.try_emplace(read<std::uint32_t>(locator + 4), reinterpret_cast<const void* const*>(slot + 4));
+		}
+		return tables;
 	}
 
-	std::vector<std::uint32_t> vtableOffsets(const Image& image, const std::string_view decoratedName)
+	const void* const* findVtable(const Image& image, const std::string_view decoratedName, const std::uint32_t offset)
 	{
-		std::vector<std::uint32_t> offsets;
-		forEachVtable(image, decoratedName, [&](const std::uint32_t at, const void* const*) {
-			if (std::ranges::find(offsets, at) == offsets.end())
-				offsets.push_back(at);
-			return false;
-		});
-		std::ranges::sort(offsets);
-		return offsets;
+		const std::map<std::uint32_t, const void* const*> tables = vtables(image, decoratedName);
+		const auto found = tables.find(offset);
+		return found != tables.end() ? found->second : nullptr;
 	}
 
 	std::optional<std::size_t> findSlot(const Image& image, const void* const* table, const std::string_view signature)

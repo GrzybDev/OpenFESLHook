@@ -216,7 +216,7 @@ namespace openfeslhook::launcher
 	void installLauncher(const HMODULE self) noexcept
 	{
 		gSelf = self;
-		const platform::Image image = platform::mainImage();
+		const platform::Image image = platform::moduleImage(GetModuleHandleW(nullptr));
 		if (image.text == nullptr || image.textSize == 0)
 			return;
 

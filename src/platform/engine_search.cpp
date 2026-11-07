@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include "platform/game_objects.hpp"
 
 namespace openfeslhook::platform
 {
@@ -18,12 +19,19 @@ namespace openfeslhook::platform
 			return at != nullptr && at >= image.text && at + length <= image.text + image.textSize;
 		}
 
-		void* const* globalReturnedBy(const Image& image, const std::uint8_t* getter) noexcept
+		const void* const* consoleCommandTable(const Image& image, const std::string_view name)
 		{
-			if (!inCode(image, getter, kGetterLength))
-				return nullptr;
-			const std::uint8_t* const load = findSignature(getter, kGetterLength, "A1 ?? ?? ?? ?? C3");
-			return load != nullptr ? globalAt(image, load + 1) : nullptr;
+			for (const std::uint8_t* const string : findStrings(image, name))
+			{
+				std::uint8_t store[7] = {0xC7, 0x46, 0x0C};
+				write(store + 3, static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(string)));
+				const std::uint8_t* const named = findBytes(image.text, image.textSize, store, sizeof(store));
+				if (named == nullptr)
+					continue;
+				if (const std::uint8_t* const table = findSignature(named + sizeof(store), 0x20, "C7 06 ?? ?? ?? ??"))
+					return read<const void* const*>(table + 2);
+			}
+			return nullptr;
 		}
 	}
 
@@ -35,28 +43,14 @@ namespace openfeslhook::platform
 		{
 			if (*p != 0xE8)
 				continue;
-			if (void* const* const global = globalReturnedBy(image, callTarget(image, p)))
-				return global;
-		}
-		return nullptr;
-	}
-
-	const void* const* consoleCommandTable(const Image& image, const std::string_view name)
-	{
-		for (const std::uint8_t* const string : findStrings(image, name))
-		{
-			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(string));
-			std::uint8_t store[7] = {0xC7, 0x46, 0x0C};
-			std::memcpy(store + 3, &address, 4);
-			const std::uint8_t* const named = findBytes(image.text, image.textSize, store, sizeof(store));
-			if (named == nullptr)
+			const std::uint8_t* const getter = callTarget(image, p);
+			if (!inCode(image, getter, kGetterLength))
 				continue;
-			if (const std::uint8_t* const table = findSignature(named + sizeof(store), 0x20, "C7 06 ?? ?? ?? ??"))
-			{
-				std::uint32_t value = 0;
-				std::memcpy(&value, table + 2, 4);
-				return reinterpret_cast<const void* const*>(static_cast<std::uintptr_t>(value));
-			}
+			const std::uint8_t* const load = findSignature(getter, kGetterLength, "A1 ?? ?? ?? ?? C3");
+			if (load == nullptr)
+				continue;
+			if (void* const* const global = globalAt(image, load + 1))
+				return global;
 		}
 		return nullptr;
 	}

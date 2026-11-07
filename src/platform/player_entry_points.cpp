@@ -199,13 +199,14 @@ namespace openfeslhook::platform
 		// The game server has three tables: its primary one, its server part's and, right after, its event
 		// listener's. Where the parts begin differs between builds (0xB0 in 1.89, 0xA8 in 1.46).
 		const std::string_view gameServer = ".?AVGameServer@hfe@dice@@";
-		if (const std::vector<std::uint32_t> parts = vtableOffsets(image, gameServer); parts.size() == 3)
+		if (const auto parts = vtables(image, gameServer); parts.size() == 3)
 		{
-			points.partOffset = parts[1];
-			points.listenerOffset = parts[2];
-			points.listenerTable = findVtable(image, gameServer, points.listenerOffset);
-			if (const void* const* const serverPart = findVtable(image, gameServer, points.partOffset))
-				fromAddLocalPlayer(image, code(serverPart[kAddLocalPlayerSlot]), points);
+			const auto serverPart = std::next(parts.begin());
+			const auto listener = std::next(serverPart);
+			points.partOffset = serverPart->first;
+			points.listenerOffset = listener->first;
+			points.listenerTable = listener->second;
+			fromAddLocalPlayer(image, code(serverPart->second[kAddLocalPlayerSlot]), points);
 		}
 		fromPlayer(image, points);
 		if (const void* const* const backend = findVtable(image, ".?AVEABackend@backend@hfe@dice@@"))

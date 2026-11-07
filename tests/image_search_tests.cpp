@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -171,7 +172,8 @@ namespace openfeslhook::platform
 			const void* const* const baseTable = findVtable(whole, name, baseOffset);
 			ASSERT_NE(baseTable, nullptr);
 			EXPECT_EQ(reinterpret_cast<std::uintptr_t>(baseTable[0]), baseFirst);
-			EXPECT_EQ(vtableOffsets(whole, name), (std::vector<std::uint32_t>{0, baseOffset}));
+			EXPECT_EQ(vtables(whole, name),
+			          (std::map<std::uint32_t, const void* const*>{{0, table}, {baseOffset, baseTable}}));
 		}
 
 		TEST(ImageSearch, FindsTheOneSlotWhoseFunctionHasABody)

@@ -219,7 +219,7 @@ namespace openfeslhook::platform
 		if (!isDedicatedServer())
 			return;
 
-		const Image image = mainImage();
+		const Image image = moduleImage(GetModuleHandleW(nullptr));
 		if (image.text == nullptr)
 			return;
 
