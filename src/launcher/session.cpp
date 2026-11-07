@@ -74,9 +74,8 @@ namespace openfeslhook::launcher
 			return answer;
 		}
 
-		// Sends a launcher request and reads the session or the refusal from the answer; the account and the soldier are
-		// the entered account's name when the server names none.
-		SessionResult ask(const relay::ServerAddress& server, const pt::ptree& request, const std::string_view account)
+		// Sends a launcher request and reads the session or the refusal from the answer.
+		SessionResult ask(const relay::ServerAddress& server, const pt::ptree& request)
 		{
 			SessionResult result;
 			try
@@ -100,8 +99,8 @@ namespace openfeslhook::launcher
 				if (answer.status == 200)
 				{
 					Session session{.sessionId = body.get<std::string>("sessionId", ""),
-					                .accountName = body.get<std::string>("accountName", std::string(account)),
-					                .soldierName = body.get<std::string>("personaName", std::string(account))};
+					                .accountName = body.get<std::string>("accountName", ""),
+					                .soldierName = body.get<std::string>("personaName", "")};
 					if (session.sessionId.empty())
 						result.refusal = body.get<std::string>("error", "");
 					else
@@ -133,7 +132,7 @@ namespace openfeslhook::launcher
 		request.put("role", "play");
 		request.put("account", std::string(account));
 		request.put("password", std::string(password));
-		return ask(server, request, account);
+		return ask(server, request);
 	}
 
 	SessionResult requestHostSession(const relay::ServerAddress& server)
@@ -141,7 +140,7 @@ namespace openfeslhook::launcher
 		pt::ptree request;
 		request.put("game", "bfheroes");
 		request.put("role", "host");
-		return ask(server, request, {});
+		return ask(server, request);
 	}
 
 	SessionResult requestLinkSession(const relay::ServerAddress& server, const std::string_view code)
@@ -150,6 +149,6 @@ namespace openfeslhook::launcher
 		request.put("game", "bfheroes");
 		request.put("role", "play");
 		request.put("code", std::string(code));
-		return ask(server, request, {});
+		return ask(server, request);
 	}
 }

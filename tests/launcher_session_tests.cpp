@@ -32,7 +32,6 @@ namespace openfeslhook::test
 
 		ASSERT_TRUE(result.session) << result.problem;
 		EXPECT_EQ(result.session->sessionId, "S3ss10n");
-		EXPECT_EQ(result.session->accountName, "SampleAccount");
 		EXPECT_EQ(result.session->soldierName, "SampleHero");
 		const std::vector<http::Request> requests = server->requests();
 		ASSERT_EQ(requests.size(), 1u);

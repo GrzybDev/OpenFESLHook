@@ -12,7 +12,9 @@ namespace openfeslhook::launcher
 	struct Session
 	{
 		std::string sessionId;
+		/// Empty when the server names none.
 		std::string accountName;
+		/// The hero the game signs in to; empty when the server names none.
 		std::string soldierName;
 	};
 

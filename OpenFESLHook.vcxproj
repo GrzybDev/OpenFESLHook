@@ -58,6 +58,7 @@
     <ClInclude Include="src\app\log_output.hpp" />
     <ClInclude Include="src\app\open_fesl_hook.hpp" />
     <ClInclude Include="src\app\settings.hpp" />
+    <ClInclude Include="src\launcher\command_line.hpp" />
     <ClInclude Include="src\launcher\dialog.hpp" />
     <ClInclude Include="src\launcher\launcher.hpp" />
     <ClInclude Include="src\launcher\session.hpp" />
@@ -96,6 +97,7 @@
     <ClCompile Include="src\app\settings.cpp" />
     <ClCompile Include="src\direct_input.cpp" />
     <ClCompile Include="src\dllmain.cpp" />
+    <ClCompile Include="src\launcher\command_line.cpp" />
     <ClCompile Include="src\launcher\dialog.cpp" />
     <ClCompile Include="src\launcher\launcher.cpp" />
     <ClCompile Include="src\launcher\session.cpp" />
