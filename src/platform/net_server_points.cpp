@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string_view>
+#include "platform/game_objects.hpp"
 
 namespace openfeslhook::platform
 {
@@ -21,11 +22,6 @@ namespace openfeslhook::platform
 		// Where the game manager listener begins in a Plasma socket manager, after its socket manager and event
 		// listener parts.
 		constexpr std::uint32_t kPlasmaListenerOffset = 8;
-
-		bool inside(const std::uint8_t* at, const std::uint8_t* start, const std::size_t size) noexcept
-		{
-			return at != nullptr && at >= start && at < start + size;
-		}
 
 		// msvcp90's std::deque<T>::push_back for a four-byte T, the same code in each instantiation up to the
 		// allocation of a new block of four, which every one makes through the game's allocation. The network server's
@@ -54,19 +50,6 @@ namespace openfeslhook::platform
 		constexpr std::size_t kLockedDisconnectLength = 0x50;
 		constexpr std::size_t kPollLength = 0x10;
 		constexpr std::size_t kNextEventLength = 0x40;
-
-		void fromNetServer(const Image& image, const void* const* table, NetServerPoints& points)
-		{
-			const auto* const disconnect = static_cast<const std::uint8_t*>(table[kLockedDisconnectSlot]);
-			points.disconnect = calledAt(image, disconnect, kLockedDisconnectLength, "FF 75 0C 8B CE FF 75 08 E8", 8);
-			points.lock = calledAt(image, disconnect, kLockedDisconnectLength, "8B CF 89 7D ?? E8", 5);
-			points.unlock = calledAt(image, disconnect, kLockedDisconnectLength, "8B CF 8B F0 E8", 4);
-			// The poll returns 8 before the server listens and otherwise jumps to the reading of the next event, which
-			// first reads the clock at +0x4F0: lea ecx, [esi+0x4f0]; call.
-			const auto* const poll = static_cast<const std::uint8_t*>(table[kNetServerPollSlot]);
-			if (const std::uint8_t* const next = calledAt(image, poll, kPollLength, "6A 08 58 C2 04 00 E9", 6))
-				points.clock = calledAt(image, next, kNextEventLength, "8D 8E F0 04 00 00 E8", 6);
-		}
 	}
 
 	bool NetServerPoints::complete() const noexcept
@@ -80,7 +63,7 @@ namespace openfeslhook::platform
 		       unlock != nullptr;
 	}
 
-	const void* findHandleNetwork(const Image& image)
+	const std::uint8_t* findHandleNetwork(const Image& image)
 	{
 		for (const std::uint8_t* const setting : findStrings(image, "GSShowNetGraph"))
 			for (const std::uint8_t* const push : findPushesOf(image, setting))
@@ -100,9 +83,8 @@ namespace openfeslhook::platform
 			findVtable(image, ".?AVPlasmaSocketManager@backend@hfe@dice@@", kPlasmaListenerOffset);
 		points.handleNetwork = findHandleNetwork(image);
 		if (points.handleNetwork != nullptr)
-			if (const std::uint8_t* const check = findSignature(static_cast<const std::uint8_t*>(points.handleNetwork),
-			                                                    kNetworkCheckWindow, kNetworkCheck))
-				std::memcpy(&points.netServerField, check + 2, sizeof(points.netServerField));
+			if (const std::uint8_t* const check = findSignature(points.handleNetwork, kNetworkCheckWindow, kNetworkCheck))
+				points.netServerField = read<std::uint32_t>(check + 2);
 		points.netServerTable = findVtable(image, ".?AVNetServer@io@hfe@dice@@");
 		points.filterAgentTable = findVtable(image, ".?AUPunkBusterFilterAgent@io@hfe@dice@@");
 		points.startThread = functionStart(image.text, findPushOf(image, findString(image, "NetServerThread")));
@@ -112,13 +94,23 @@ namespace openfeslhook::platform
 		points.returnConnection = findSignature(image.text, image.textSize, kReturnConnection);
 		points.eraseMapNode = findSignature(image.text, image.textSize, kEraseMapNode);
 		if (points.netServerTable != nullptr)
-			fromNetServer(image, points.netServerTable, points);
+		{
+			const auto* const disconnect = static_cast<const std::uint8_t*>(points.netServerTable[kLockedDisconnectSlot]);
+			points.disconnect = calledAt(image, disconnect, kLockedDisconnectLength, "FF 75 0C 8B CE FF 75 08 E8", 8);
+			points.lock = calledAt(image, disconnect, kLockedDisconnectLength, "8B CF 89 7D ?? E8", 5);
+			points.unlock = calledAt(image, disconnect, kLockedDisconnectLength, "8B CF 8B F0 E8", 4);
+			// The poll returns 8 before the server listens and otherwise jumps to the reading of the next event, which
+			// first reads the clock at +0x4F0: lea ecx, [esi+0x4f0]; call.
+			const auto* const poll = static_cast<const std::uint8_t*>(points.netServerTable[kNetServerPollSlot]);
+			if (const std::uint8_t* const next = calledAt(image, poll, kPollLength, "6A 08 58 C2 04 00 E9", 6))
+				points.clock = calledAt(image, next, kNextEventLength, "8D 8E F0 04 00 00 E8", 6);
+		}
 
 		const void* const* const clientTable = findVtable(image, ".?AVNetClient@io@hfe@dice@@");
 		if (clientTable == nullptr)
 			return points;
 		const auto* const init = static_cast<const std::uint8_t*>(clientTable[kNetServerInitSlot]);
-		if (!inside(init, image.text, image.textSize - kClientInitLength))
+		if (init == nullptr || init < image.text || init >= image.text + image.textSize - kClientInitLength)
 			return points;
 
 		// The init first asks the socket manager whether it is ready: mov ecx, [manager]; mov eax, [ecx]; call

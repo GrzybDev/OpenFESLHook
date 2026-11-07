@@ -159,6 +159,17 @@ namespace openfeslhook::platform
 		return findAllBytes(image.text, image.textSize, instruction.data(), instruction.size());
 	}
 
+	const std::uint8_t* findDataReference(const Image& image, const std::uint8_t* target)
+	{
+		if (target == nullptr)
+			return nullptr;
+		const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(target));
+		for (const std::uint8_t* const entry : findAllBytes(image.base, image.size, &address, sizeof(address)))
+			if (entry < image.text || entry >= image.text + image.textSize)
+				return entry;
+		return nullptr;
+	}
+
 	const std::uint8_t* findCallTo(const Image& image, const std::uint8_t* target) noexcept
 	{
 		if (image.text == nullptr)

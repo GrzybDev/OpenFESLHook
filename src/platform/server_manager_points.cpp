@@ -145,23 +145,15 @@ namespace openfeslhook::platform
 		for (const std::uint8_t* const push : findPushesOf(image, findString(image, "dev-eu")))
 			if (findSignature(push + 5, 2, "8D 8E") != nullptr)
 			{
-				std::memcpy(&points.dataCenterField, push + 7, sizeof(points.dataCenterField));
+				points.dataCenterField = read<std::uint32_t>(push + 7);
 				break;
 			}
 		// sv.serverName reads the settings through their getter before it does anything else.
 		points.serverSettings = consoleCommandGlobal(image, "serverName");
 		// The listen reports the port it opened; its one table entry is found by the function's address.
 		const std::uint8_t* const listening = findString(image, "GM: GameManager listening on port %d\n");
-		if (const std::uint8_t* const listen = functionStart(image.text, findPushOf(image, listening)))
-		{
-			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(listen));
-			for (const std::uint8_t* const entry : findAllBytes(image.base, image.size, &address, sizeof(address)))
-				if (entry < image.text || entry >= image.text + image.textSize)
-				{
-					points.gameManagerListen = reinterpret_cast<const void* const*>(entry);
-					break;
-				}
-		}
+		points.gameManagerListen = reinterpret_cast<const void* const*>(
+			findDataReference(image, functionStart(image.text, findPushOf(image, listening))));
 		// The builder is the one function that pushes "elo_rank", the first attribute it writes.
 		if (const std::uint8_t* const builder =
 		        framelessMethodStart(image, findPushOf(image, findString(image, "elo_rank"))))

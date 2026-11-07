@@ -29,31 +29,31 @@ namespace openfeslhook::platform
 		const void* const* listenerTable = nullptr;
 
 		/// Constructs an empty player info.
-		const void* constructInfo = nullptr;
+		const std::uint8_t* constructInfo = nullptr;
 
 		/// Reads a player info from what a game sent, through the reader the info holds.
-		const void* readInfo = nullptr;
+		const std::uint8_t* readInfo = nullptr;
 
 		/// Destroys a player info.
-		const void* destroyInfo = nullptr;
+		const std::uint8_t* destroyInfo = nullptr;
 
 		/// Builds the arguments of a script event about a connection and a player name.
-		const void* buildScriptArguments = nullptr;
+		const std::uint8_t* buildScriptArguments = nullptr;
 
 		/// Returns the dispatcher of the script events.
-		const void* scriptEvents = nullptr;
+		const std::uint8_t* scriptEvents = nullptr;
 
 		/// Fires a script event.
-		const void* fireScriptEvent = nullptr;
+		const std::uint8_t* fireScriptEvent = nullptr;
 
 		/// Releases the arguments of a script event.
-		const void* releaseScriptArguments = nullptr;
+		const std::uint8_t* releaseScriptArguments = nullptr;
 
 		/// The id of the PrePlayerConnect script event, or -1.
 		std::int32_t prePlayerConnect = -1;
 
 		/// Creates the player of a connection, numbering its name when another player has it.
-		const void* createPlayer = nullptr;
+		const std::uint8_t* createPlayer = nullptr;
 
 		/// The global that holds the player manager.
 		void* const* playerManager = nullptr;
@@ -68,28 +68,28 @@ namespace openfeslhook::platform
 		void* const* eventManager = nullptr;
 
 		/// The game's memory allocation.
-		const void* allocate = nullptr;
+		const std::uint8_t* allocate = nullptr;
 
 		/// Constructs the event that announces a created player.
-		const void* constructCreatePlayerEvent = nullptr;
+		const std::uint8_t* constructCreatePlayerEvent = nullptr;
 
 		/// The size of that event.
 		std::size_t createPlayerEventSize = 0;
 
 		/// Adds a player to the game server's scoring.
-		const void* addToScoring = nullptr;
+		const std::uint8_t* addToScoring = nullptr;
 
 		/// Processes the disconnections the game server has queued.
-		const void* processDisconnections = nullptr;
+		const std::uint8_t* processDisconnections = nullptr;
 
 		/// Sends a connection the server info.
-		const void* sendServerInfo = nullptr;
+		const std::uint8_t* sendServerInfo = nullptr;
 
 		/// Finishes a connection's entry once its player info has been handled.
-		const void* finishEntry = nullptr;
+		const std::uint8_t* finishEntry = nullptr;
 
 		/// Formats a backend time as text.
-		const void* formatTime = nullptr;
+		const std::uint8_t* formatTime = nullptr;
 
 		/// The global that holds the server settings the `sv.*` console commands change.
 		void* const* serverSettings = nullptr;
@@ -98,10 +98,10 @@ namespace openfeslhook::platform
 		void* const* reservedSlots = nullptr;
 
 		/// Counts the players who hold a reserved slot.
-		const void* countReservedPlayers = nullptr;
+		const std::uint8_t* countReservedPlayers = nullptr;
 
 		/// Tells whether a player name holds a reserved slot.
-		const void* isReserved = nullptr;
+		const std::uint8_t* isReserved = nullptr;
 
 		/// The player's virtual-function slot that takes its player info; 0 when not found.
 		std::size_t setInfoSlot = 0;

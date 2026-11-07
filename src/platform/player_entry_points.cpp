@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "platform/engine_search.hpp"
+#include "platform/game_objects.hpp"
 #include "platform/net_server_points.hpp"
 
 namespace openfeslhook::platform
@@ -43,34 +44,22 @@ namespace openfeslhook::platform
 		// The backend's time getter.
 		constexpr std::string_view kBackendTime = "8B 89 A4 00 00 00 85 C9 75 0B 8B 4C 24 04 E8";
 
-		const std::uint8_t* code(const void* function) noexcept
-		{
-			return static_cast<const std::uint8_t*>(function);
-		}
-
-		std::uint32_t dword(const std::uint8_t* at) noexcept
-		{
-			std::uint32_t value = 0;
-			std::memcpy(&value, at, sizeof(value));
-			return value;
-		}
-
 		// The field a std::string setter of the player assigns to (add ecx, field; jmp [std::string::assign]), or 0.
 		std::uint32_t stringSetterField(const Image& image, const void* function) noexcept
 		{
-			const auto* const at = code(function);
+			const auto* const at = static_cast<const std::uint8_t*>(function);
 			if (at < image.text || at + 8 > image.text + image.textSize || at[0] != 0x81 || at[1] != 0xC1 ||
 			    at[6] != 0xFF || at[7] != 0x25)
 				return 0;
-			return dword(at + 2);
+			return read<std::uint32_t>(at + 2);
 		}
 
 		// Whether a getter returns a field by reference: lea eax, [ecx+field]; ret.
 		bool returnsField(const Image& image, const void* function, const std::uint32_t field) noexcept
 		{
-			const auto* const at = code(function);
+			const auto* const at = static_cast<const std::uint8_t*>(function);
 			return at >= image.text && at + 7 <= image.text + image.textSize && at[0] == 0x8D && at[1] == 0x81 &&
-			       dword(at + 2) == field && at[6] == 0xC3;
+			       read<std::uint32_t>(at + 2) == field && at[6] == 0xC3;
 		}
 
 		// The player's setters of its join time and server text, which nothing in the client build calls. A game
@@ -79,10 +68,10 @@ namespace openfeslhook::platform
 		void fromPlayer(const Image& image, PlayerEntryPoints& points)
 		{
 			const void* const* const player = findVtable(image, ".?AVPlayer@hfe@dice@@");
-			const std::uint8_t* const read = findSignature(image.text, image.textSize, kJoinTimeRead);
-			if (player == nullptr || read == nullptr)
+			const std::uint8_t* const joinTime = findSignature(image.text, image.textSize, kJoinTimeRead);
+			if (player == nullptr || joinTime == nullptr)
 				return;
-			const std::size_t getter = dword(read + 18) / sizeof(void*);
+			const std::size_t getter = read<std::uint32_t>(joinTime + 18) / sizeof(void*);
 			if (getter == 0 || stringSetterField(image, player[getter - 1]) == 0)
 				return;
 			points.setJoinTimeSlot = getter - 1;
@@ -105,19 +94,8 @@ namespace openfeslhook::platform
 		// The id of a script event: the game names its events in a table of {name, id} pairs.
 		std::int32_t scriptEventId(const Image& image, const std::string_view name)
 		{
-			const std::uint8_t* const string = findString(image, name);
-			if (string == nullptr)
-				return -1;
-			const auto address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(string));
-			for (const std::uint8_t* const entry : findAllBytes(image.base, image.size, &address, sizeof(address)))
-			{
-				if (entry >= image.text && entry < image.text + image.textSize)
-					continue;
-				std::int32_t id = 0;
-				std::memcpy(&id, entry + 4, sizeof(id));
-				return id;
-			}
-			return -1;
+			const std::uint8_t* const entry = findDataReference(image, findString(image, name));
+			return entry != nullptr ? read<std::int32_t>(entry + 4) : -1;
 		}
 
 		void fromAddLocalPlayer(const Image& image, const std::uint8_t* add, PlayerEntryPoints& points)
@@ -139,7 +117,7 @@ namespace openfeslhook::platform
 			points.constructInfo = calledAt(image, add, length, "8D 4D ?? E8 ?? ?? ?? ?? 8B 06 8B CE", 3);
 			if (const std::uint8_t* const setInfo = findSignature(add, length, kSetInfoCall))
 			{
-				points.setInfoSlot = dword(setInfo + 2) / sizeof(void*);
+				points.setInfoSlot = read<std::uint32_t>(setInfo + 2) / sizeof(void*);
 				points.destroyInfo = callTarget(image, setInfo + 13);
 			}
 			points.addToScoring = calledAt(image, add, length, "81 C1 ?? ?? ?? ?? E8", 6);
@@ -206,7 +184,7 @@ namespace openfeslhook::platform
 			points.partOffset = serverPart->first;
 			points.listenerOffset = listener->first;
 			points.listenerTable = listener->second;
-			fromAddLocalPlayer(image, code(serverPart->second[kAddLocalPlayerSlot]), points);
+			fromAddLocalPlayer(image, static_cast<const std::uint8_t*>(serverPart->second[kAddLocalPlayerSlot]), points);
 		}
 		fromPlayer(image, points);
 		if (const void* const* const backend = findVtable(image, ".?AVEABackend@backend@hfe@dice@@"))
@@ -217,20 +195,19 @@ namespace openfeslhook::platform
 
 		if (points.createPlayer != nullptr)
 		{
-			const auto* const create = code(points.createPlayer);
-			points.settings = globalLoadedBy(image, create, kCreatePlayerLength,
+			points.settings = globalLoadedBy(image, points.createPlayer, kCreatePlayerLength,
 			                                 "8B 0D ?? ?? ?? ?? 8B 01 83 65 FC 00 8D 55 ?? 52 8D 55 ?? 52 FF 50 10");
 			points.playerManager = globalLoadedBy(
-				image, create, kCreatePlayerLength,
+				image, points.createPlayer, kCreatePlayerLength,
 				"8B 0D ?? ?? ?? ?? 8B 01 53 8D 55 ?? 52 FF 35 ?? ?? ?? ?? C7 45 FC ?? ?? ?? ?? FF 50 78");
 		}
-		if (const void* const handleNetwork = findHandleNetwork(image))
+		if (const std::uint8_t* const handleNetwork = findHandleNetwork(image))
 			points.processDisconnections =
-				calledAt(image, code(handleNetwork), kHandleNetworkLength, "83 7D ?? 08 0F 85 ?? ?? ?? ?? 8B CE E8",
-				         12);
+				calledAt(image, handleNetwork, kHandleNetworkLength, "83 7D ?? 08 0F 85 ?? ?? ?? ?? 8B CE E8", 12);
 		if (const void* const* const primary = findVtable(image, gameServer))
 			points.sendServerInfo =
-				calledAt(image, code(primary[kLevelLoadedSlot]), kLevelLoadedLength, "6A FF 8B CE 88 5D ?? E8", 7);
+				calledAt(image, static_cast<const std::uint8_t*>(primary[kLevelLoadedSlot]), kLevelLoadedLength,
+				         "6A FF 8B CE 88 5D ?? E8", 7);
 		points.finishEntry = findSignature(image.text, image.textSize, kFinishEntry);
 		points.formatTime =
 			functionStart(image.text, findPushOf(image, findString(image, "%d-%02d-%02d %02d:%02d:%02d")));
@@ -240,8 +217,8 @@ namespace openfeslhook::platform
 		points.reservedSlots = consoleCommandGlobal(image, "addNick");
 		points.countReservedPlayers = findSignature(image.text, image.textSize, kReservedCount);
 		if (points.countReservedPlayers != nullptr)
-			points.isReserved = calledAt(image, code(points.countReservedPlayers), kReservedCountLength,
-			                             "8B 01 FF 50 20 50 8B CB E8", 8);
+			points.isReserved =
+				calledAt(image, points.countReservedPlayers, kReservedCountLength, "8B 01 FF 50 20 50 8B CB E8", 8);
 		return points;
 	}
 }

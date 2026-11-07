@@ -72,6 +72,12 @@ namespace openfeslhook::platform
 	/// @param target The address the instructions push.
 	[[nodiscard]] std::vector<const std::uint8_t*> findPushesOf(const Image& image, const std::uint8_t* target);
 
+	/// The first place outside the code that holds an address, such as a table's entry, or nullptr, also when the
+	/// address is null.
+	/// @param image The image.
+	/// @param target The address.
+	[[nodiscard]] const std::uint8_t* findDataReference(const Image& image, const std::uint8_t* target);
+
 	/// The first relative `call` in the code whose target is the given function, or nullptr.
 	/// @param image The image.
 	/// @param target The function the call reaches.

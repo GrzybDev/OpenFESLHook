@@ -31,9 +31,7 @@ namespace openfeslhook::platform
 		{
 			if (!within(image, p, 9) || p[0] != 0xE8)
 				return std::nullopt;
-			std::int32_t relative = 0;
-			std::memcpy(&relative, p + 1, 4);
-			const std::uint8_t* const getter = p + 5 + relative;
+			const std::uint8_t* const getter = callTarget(image, p);
 			if (!within(image, getter, 6) || getter[0] != 0xA0 || getter[5] != 0xC3)
 				return std::nullopt;
 			if (p[5] != 0x84 || p[6] != 0xC0) // test al, al
@@ -93,24 +91,19 @@ namespace openfeslhook::platform
 
 		// The content scanner is the sole caller of the per-descriptor localiser, which is the one function that
 		// builds the unique "/Info/" sub-path.
-		if (const std::uint8_t* const info = findString(image, "/Info/"))
-			if (const std::uint8_t* const localiser = functionStart(image.text, findPushOf(image, info)))
-				if (const std::uint8_t* const call = findCallTo(image, localiser))
-					points.contentScanner = functionStart(image.text, call);
+		if (const std::uint8_t* const localiser = functionReferencing(image, "/Info/"))
+			points.contentScanner = functionStart(image.text, findCallTo(image, localiser));
 
 		// The client archive set and the path that reaches it: the string is mounted by one function, which a gate
 		// guards (the client archives), and that function is called past another gate (the renderer).
-		if (const std::uint8_t* const archives = findString(image, "ClientArchives.con"))
-			if (const std::uint8_t* const push = findPushOf(image, archives))
-			{
-				points.clientArchives = lastGateBefore(image, push, 0x100);
-				if (const std::uint8_t* const mount = functionStart(image.text, push))
-					if (const std::uint8_t* const call = findCallTo(image, mount))
-						points.renderer = lastGateBefore(image, call, 0x100);
-			}
+		if (const std::uint8_t* const push = findPushOf(image, findString(image, "ClientArchives.con")))
+		{
+			points.clientArchives = lastGateBefore(image, push, 0x100);
+			if (const std::uint8_t* const mount = functionStart(image.text, push))
+				points.renderer = lastGateBefore(image, findCallTo(image, mount), 0x100);
+		}
 
-		if (const std::uint8_t* const client = findString(image, "/client.zip"))
-			points.levelClient = lastGateBefore(image, findPushOf(image, client), 0x20);
+		points.levelClient = lastGateBefore(image, findPushOf(image, findString(image, "/client.zip")), 0x20);
 
 		// The map-list validator's dedicated-server branch and its success tail, within the function that logs the
 		// "map not found" message.

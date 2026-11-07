@@ -19,7 +19,7 @@ namespace openfeslhook::platform
 		const void* const* gameServerTable = nullptr;
 
 		/// The game server's handling of its network: new connections, lost ones and the players' packets.
-		const void* handleNetwork = nullptr;
+		const std::uint8_t* handleNetwork = nullptr;
 
 		/// Where the game server holds its network server, which handleNetwork checks first; 0 when not found.
 		std::uint32_t netServerField = 0;
@@ -39,46 +39,46 @@ namespace openfeslhook::platform
 		void* const* socketManager = nullptr;
 
 		/// The game's memory allocation, which `operator new` and `new[]` both are.
-		const void* allocate = nullptr;
+		const std::uint8_t* allocate = nullptr;
 
 		/// The constructor of a connection.
-		const void* constructConnection = nullptr;
+		const std::uint8_t* constructConnection = nullptr;
 
 		/// The constructor of a bit stream.
-		const void* constructBitStream = nullptr;
+		const std::uint8_t* constructBitStream = nullptr;
 
 		/// Puts a filter agent into a filter chain at a position.
-		const void* addFilterAgent = nullptr;
+		const std::uint8_t* addFilterAgent = nullptr;
 
 		/// Starts a network server's thread, which waits on the listening socket and handles what arrives.
-		const void* startThread = nullptr;
+		const std::uint8_t* startThread = nullptr;
 
 		/// Appends a value to a std::deque of four-byte values.
-		const void* pushBack = nullptr;
+		const std::uint8_t* pushBack = nullptr;
 
 		/// Reads a network server's clock: the milliseconds since it started listening.
-		const void* clock = nullptr;
+		const std::uint8_t* clock = nullptr;
 
 		/// Sends a connection a ping.
-		const void* ping = nullptr;
+		const std::uint8_t* ping = nullptr;
 
 		/// Disconnects a connection, which leaves the network server at its next upkeep.
-		const void* disconnect = nullptr;
+		const std::uint8_t* disconnect = nullptr;
 
 		/// Hands the game server an event about a connection the next time it asks for one.
-		const void* queueEvent = nullptr;
+		const std::uint8_t* queueEvent = nullptr;
 
 		/// Puts a connection back among the network server's free ones.
-		const void* returnConnection = nullptr;
+		const std::uint8_t* returnConnection = nullptr;
 
 		/// Erases a node from a std::map whose keys and values take four bytes each.
-		const void* eraseMapNode = nullptr;
+		const std::uint8_t* eraseMapNode = nullptr;
 
 		/// Takes one of the network server's locks.
-		const void* lock = nullptr;
+		const std::uint8_t* lock = nullptr;
 
 		/// Releases one of the network server's locks.
-		const void* unlock = nullptr;
+		const std::uint8_t* unlock = nullptr;
 
 		/// Whether every point was found.
 		[[nodiscard]] bool complete() const noexcept;
@@ -100,7 +100,7 @@ namespace openfeslhook::platform
 	/// Finds the game server's handling of its network, which nothing in the client build calls: it reads whether the
 	/// net graph is shown right after checking that the game server has a network server. Null when it is not found.
 	/// @param image The game executable as it is mapped.
-	[[nodiscard]] const void* findHandleNetwork(const Image& image);
+	[[nodiscard]] const std::uint8_t* findHandleNetwork(const Image& image);
 
 	/// Finds the network server's points in the game executable.
 	/// @param image The game executable as it is mapped.

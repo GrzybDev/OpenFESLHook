@@ -44,13 +44,13 @@ namespace openfeslhook::platform
 
 		/// Fills the server game settings' create-game parameters from the settings: the game's version, the seats, the
 		/// join mode and the attributes the server browser shows. Nothing in the client build calls it.
-		const void* settingsToParams = nullptr;
+		const std::uint8_t* settingsToParams = nullptr;
 
 		/// The global that holds the map list the server plays through.
 		void* const* mapList = nullptr;
 
 		/// Returns the map list's entry at an index, or null for an index past its end.
-		const void* mapEntry = nullptr;
+		const std::uint8_t* mapEntry = nullptr;
 
 		/// Where the map list holds the index of the map being played.
 		std::uint32_t currentMapField = 0;
