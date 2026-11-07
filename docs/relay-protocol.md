@@ -133,9 +133,11 @@ The Battlefield Heroes launcher asks the relay server for a session over HTTP, a
 | Field      | Value                                           |
 |:-----------|:------------------------------------------------|
 | `game`     | `bfheroes`                                      |
-| `role`     | `play` to join games, `host` to run a server    |
+| `role`     | `play`                                          |
 | `account`  | The account name the player entered             |
 | `password` | The password the player entered                 |
+
+To run a server, the launcher sends only `game` (`bfheroes`) and `role` (`host`): a server signs in with the relay server's shared server account, which the answer names.
 
 Started from a website link, `openfesl-bfheroes://launch?role=play&code=<code>`, the launcher signs in with the link's one-time code instead, always to play; it never takes the server from the link.
 
@@ -145,7 +147,7 @@ Started from a website link, `openfesl-bfheroes://launch?role=play&code=<code>`,
 | `role` | `play`                    |
 | `code` | The link's `code`         |
 
-A server grants the session with `200` and a JSON body holding `sessionId` and, optionally, `personaName`. The launcher starts the game with `+sessionId`, and a server also with the account, its password and the persona as the server's soldier (the account name when `personaName` is missing). Any other status, or a `200` without `sessionId`, refuses the sign-in; an `error` field names the reason, and the launcher shows its own message for `wrong-sign-in`, `unknown-game`, `disabled`, `banned`, `deactivated` and `no-persona`, and a general one otherwise. For a code, `wrong-sign-in` means that it expired or was already used.
+A server grants the session with `200` and a JSON body holding `sessionId` and, optionally, `accountName` and `personaName`. The launcher starts the game with `+sessionId`. For a website link's code, it adds `+logIntoSoldier 1 +soldierName` set to `personaName`, so the main menu picks that hero with its items, as the hero selection would; a sign-in with an account and password, or an answer without `personaName`, leaves the game on its hero selection. A server gets `+eaAccountName` set to `accountName`, a placeholder `+eaAccountPassword` and `+soldierName` set to `personaName`; the game never signs in with the account name and password, only with the session. Any other status, or a `200` without `sessionId`, refuses the sign-in; an `error` field names the reason, and the launcher shows its own message for `wrong-sign-in`, `unknown-game`, `disabled`, `banned`, `deactivated` and `no-persona`, and a general one otherwise. For a code, `wrong-sign-in` means that it expired or was already used.
 
 ## What the game needs from a server
 
