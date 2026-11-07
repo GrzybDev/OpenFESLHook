@@ -6,6 +6,7 @@
 
 #include "app/settings.hpp"
 #include "launcher/command_line.hpp"
+#include "launcher/credentials.hpp"
 #include "launcher/dialog.hpp"
 #include "launcher/launch_link.hpp"
 #include "platform/detour.hpp"
@@ -51,6 +52,7 @@ namespace openfeslhook::launcher
 			};
 			defaults.remember = true;
 			defaults.account = read(L"Account");
+			defaults.password = defaults.account.empty() ? std::string() : readPassword(defaults.account);
 			defaults.language = read(L"Language");
 			defaults.map = read(L"Map");
 			defaults.ranked = GetPrivateProfileIntW(L"Launcher", L"Ranked", 0, path.c_str()) != 0;
@@ -58,8 +60,17 @@ namespace openfeslhook::launcher
 			return defaults;
 		}
 
-		void saveDefaults(const Choice& choice)
+		void saveDefaults(const Defaults& previous, const Choice& choice)
 		{
+			// A password is kept only for the account Remember me keeps; a server, which enters no account, keeps the
+			// one remembered for playing.
+			const bool keepsPrevious =
+				choice.remember && (choice.mode == Mode::Host || choice.account == previous.account);
+			if (!previous.account.empty() && !keepsPrevious)
+				deletePassword(previous.account);
+			if (!choice.remember && !choice.account.empty())
+				deletePassword(choice.account);
+
 			const std::filesystem::path file = rememberFile();
 			if (file.empty())
 				return;
@@ -72,13 +83,15 @@ namespace openfeslhook::launcher
 			std::error_code error;
 			std::filesystem::create_directories(file.parent_path(), error);
 			const std::wstring path = file.wstring();
-			// The password is deliberately not stored, and a server, which enters no account, keeps the one remembered
-			// for playing.
+			// The password goes to the Credential Manager, never into the file.
 			WritePrivateProfileStringW(L"Launcher", L"Remember", L"1", path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Mode", choice.mode == Mode::Host ? L"host" : L"play", path.c_str());
 			if (choice.mode == Mode::Play)
+			{
 				WritePrivateProfileStringW(L"Launcher", L"Account", platform::widen(choice.account).c_str(),
 				                           path.c_str());
+				writePassword(choice.account, choice.password);
+			}
 			WritePrivateProfileStringW(L"Launcher", L"Language", platform::widen(choice.language).c_str(), path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Map", platform::widen(choice.map).c_str(), path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Ranked", choice.ranked ? L"1" : L"0", path.c_str());
@@ -176,7 +189,7 @@ namespace openfeslhook::launcher
 					return; // the player cancelled, so this process ends without starting the game
 
 				if (!choice->viaLink)
-					saveDefaults(*choice);
+					saveDefaults(defaults, *choice);
 				const std::string language = choice->language.empty() ? systemLanguage() : choice->language;
 				launchGame(exe, buildCommandLine(exe, *choice, language));
 			}

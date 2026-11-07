@@ -7,6 +7,7 @@
 #include <commctrl.h>
 #include <dwmapi.h>
 
+#include "launcher/credentials.hpp"
 #include "launcher/website_links.hpp"
 #include "platform/text.hpp"
 #include "platform/translation.hpp"
@@ -58,6 +59,8 @@ namespace openfeslhook::launcher
 			// The account and password the player entered to play; empty for a server and for a website link.
 			std::string account;
 			std::string password;
+			// Whether the password is the one Remember me stored, which a refused sign-in removes.
+			bool storedPassword = false;
 			// The code of the website link to sign in with in place of the account and password; empty for those.
 			std::string code;
 			SessionResult result;
@@ -264,6 +267,7 @@ namespace openfeslhook::launcher
 			SendDlgItemMessageW(dialog, IDC_MAP, CB_SETCURSEL, static_cast<WPARAM>(map < 0 ? 0 : map), 0);
 
 			SetDlgItemTextW(dialog, IDC_ACCOUNT, platform::widen(defaults.account).c_str());
+			SetDlgItemTextW(dialog, IDC_PASSWORD, platform::widen(defaults.password).c_str());
 			CheckDlgButton(dialog, IDC_REMEMBER, defaults.remember ? BST_CHECKED : BST_UNCHECKED);
 			// A website link only ever signs in to play.
 			const bool host = defaults.mode == Mode::Host && state.link->kind == LinkKind::None;
@@ -284,7 +288,11 @@ namespace openfeslhook::launcher
 				else if (job.host)
 					job.result = requestHostSession(job.server);
 				else
+				{
 					job.result = requestSession(job.server, job.account, job.password);
+					if (job.storedPassword && !job.result.session && job.result.problem.empty())
+						deletePassword(job.account);
+				}
 			});
 		}
 
@@ -306,12 +314,13 @@ namespace openfeslhook::launcher
 				MessageBeep(MB_ICONWARNING);
 				return;
 			}
-			startSignIn(state, dialog,
-			            {.dialog = dialog,
-			             .server = *state.server,
-			             .account = platform::narrow(account),
-			             .password = platform::narrow(password)},
-			            "launcher.status.signing_in");
+			SignInJob job{.dialog = dialog,
+			              .server = *state.server,
+			              .account = platform::narrow(account),
+			              .password = platform::narrow(password)};
+			job.storedPassword = !state.defaults->password.empty() && job.account == state.defaults->account &&
+			                     job.password == state.defaults->password;
+			startSignIn(state, dialog, std::move(job), "launcher.status.signing_in");
 		}
 
 		// Signs in with the website link the launcher was started with, or says why this copy cannot use it.
@@ -332,6 +341,8 @@ namespace openfeslhook::launcher
 			{
 				enableControls(state, dialog, true);
 				updateMode(state, dialog); // the map controls follow the mode again
+				if (job.storedPassword && job.result.problem.empty())
+					SetDlgItemTextW(dialog, IDC_PASSWORD, L"");
 				if (job.result.problem.empty())
 					setText(state, dialog, IDC_STATUS, refusalText(job.result.refusal, viaLink));
 				else
@@ -350,6 +361,7 @@ namespace openfeslhook::launcher
 			choice.mode = host ? Mode::Host : Mode::Play;
 			choice.session = *job.result.session;
 			choice.account = job.account;
+			choice.password = job.password;
 			choice.language = languageCode(dialog);
 			// The first map item means "leave it to the server's map list", which the launch passes as no map at all.
 			const LRESULT mapIndex = SendDlgItemMessageW(dialog, IDC_MAP, CB_GETCURSEL, 0, 0);
@@ -394,9 +406,11 @@ namespace openfeslhook::launcher
 				SetWindowLongPtrW(dialog, GWLP_USERDATA, static_cast<LONG_PTR>(lParam));
 				applyModernFrame(dialog);
 				prefill(*initial, dialog);
+				const Defaults& defaults = *initial->defaults;
 				const int focus = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED ? IDOK
-				                  : initial->defaults->account.empty()                     ? IDC_ACCOUNT
-				                                                                           : IDC_PASSWORD;
+				                  : defaults.account.empty()                               ? IDC_ACCOUNT
+				                  : defaults.password.empty()                              ? IDC_PASSWORD
+				                                                                           : IDOK;
 				SetFocus(GetDlgItem(dialog, focus));
 				signInWithLink(*initial, dialog);
 				return FALSE; // the focus was set here
