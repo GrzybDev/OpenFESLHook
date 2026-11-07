@@ -9,10 +9,7 @@ namespace openfeslhook::net
 	                                          const std::string_view host, Accepted accepted)
 	{
 		const std::shared_ptr<Listener> listener(new Listener(io, std::move(accepted)));
-		const boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address_v4(service.address), service.port);
-		listener->acceptor_.open(endpoint.protocol());
-		listener->acceptor_.set_option(ExclusiveAddressUse());
-		listener->acceptor_.bind(endpoint);
+		bindExclusively(listener->acceptor_, {boost::asio::ip::address_v4(service.address), service.port});
 		listener->acceptor_.listen();
 		listener->topic_ = protocolTopic(service.protocol);
 		listener->description_ =

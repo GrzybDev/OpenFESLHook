@@ -69,21 +69,13 @@ namespace openfeslhook::net
 		class StreamLink;
 		class DatagramLink;
 
-		struct Key
-		{
-			relay::Channel channel;
-			std::uint16_t connection;
-
-			auto operator<=>(const Key&) const = default;
-		};
-
 		boost::asio::io_context& io_;
 		Target target_;
 		std::string to_;
 		std::shared_ptr<boost::asio::ssl::context> tls_;
-		std::map<Key, std::shared_ptr<Link>> links_;
+		std::map<relay::ConnectionKey, std::shared_ptr<Link>> links_;
 		std::array<std::uint16_t, 3> lastNumbers_{};
 
-		void ended(Key key);
+		void ended(relay::ConnectionKey key);
 	};
 }

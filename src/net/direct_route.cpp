@@ -3,12 +3,24 @@
 
 #include "logging/log.hpp"
 #include "tls/client_tls.hpp"
+#include "util/text.hpp"
 
 namespace openfeslhook::net
 {
 	class DirectRoute::Link
 	{
 	public:
+		/// Prepares a link that has not connected yet.
+		/// @param target The server, with its port.
+		/// @param route The route, told when the link ends.
+		/// @param key The game connection the link serves.
+		/// @param endpoint The game connection, told when the link ends.
+		Link(Target target, std::weak_ptr<DirectRoute> route, const relay::ConnectionKey key,
+		     std::weak_ptr<relay::Endpoint> endpoint)
+			: target_(std::move(target)), route_(std::move(route)), key_(key), endpoint_(std::move(endpoint))
+		{
+		}
+
 		virtual ~Link() = default;
 
 		/// Connects to the server, after which what it sends goes to the endpoint.
@@ -20,6 +32,24 @@ namespace openfeslhook::net
 
 		/// Closes the connection to the server without telling the endpoint.
 		virtual void close() = 0;
+
+	protected:
+		Target target_;
+		std::string from_ = std::format("from {}:{}", target_.host, target_.port);
+		std::weak_ptr<DirectRoute> route_;
+		relay::ConnectionKey key_;
+		std::weak_ptr<relay::Endpoint> endpoint_;
+		bool closed_ = false;
+
+		/// Closes the connection and tells the endpoint and the route that the link ended.
+		void finish()
+		{
+			close();
+			if (const std::shared_ptr<relay::Endpoint> endpoint = endpoint_.lock())
+				endpoint->close();
+			if (const std::shared_ptr<DirectRoute> route = route_.lock())
+				route->ended(key_);
+		}
 	};
 
 	namespace
@@ -35,9 +65,10 @@ namespace openfeslhook::net
 	{
 	public:
 		StreamLink(boost::asio::io_context& io, Target target, std::shared_ptr<boost::asio::ssl::context> tls,
-		           std::weak_ptr<DirectRoute> route, const Key key, std::weak_ptr<relay::Endpoint> endpoint)
-			: tls_(std::move(tls)), stream_(makeStream(io, tls_.get())), resolver_(io), target_(std::move(target)),
-			  route_(std::move(route)), key_(key), endpoint_(std::move(endpoint))
+		           std::weak_ptr<DirectRoute> route, const relay::ConnectionKey key,
+		           std::weak_ptr<relay::Endpoint> endpoint)
+			: Link(std::move(target), std::move(route), key, std::move(endpoint)), tls_(std::move(tls)),
+			  stream_(makeStream(io, tls_.get())), resolver_(io)
 		{
 		}
 
@@ -99,16 +130,10 @@ namespace openfeslhook::net
 		std::shared_ptr<boost::asio::ssl::context> tls_;
 		Stream stream_;
 		boost::asio::ip::tcp::resolver resolver_;
-		Target target_;
-		std::string from_ = std::format("from {}:{}", target_.host, target_.port);
-		std::weak_ptr<DirectRoute> route_;
-		Key key_;
-		std::weak_ptr<relay::Endpoint> endpoint_;
 		fesl::PacketStream packets_;
 		std::array<std::uint8_t, 16 * 1024> buffer_{};
 		std::deque<fesl::Packet> writes_;
 		bool connected_ = false;
-		bool closed_ = false;
 
 		static Stream makeStream(boost::asio::io_context& io, boost::asio::ssl::context* context)
 		{
@@ -122,10 +147,9 @@ namespace openfeslhook::net
 		{
 			if constexpr (kUsesTls<Stream>)
 			{
-				boost::system::error_code notAddress;
-				(void)boost::asio::ip::make_address(target_.host, notAddress);
 				// Server names are only sent for host names; an address is not one.
-				if (notAddress && !SSL_set_tlsext_host_name(stream_.native_handle(), target_.host.c_str()))
+				if (!util::isAddress(target_.host) &&
+				    !SSL_set_tlsext_host_name(stream_.native_handle(), target_.host.c_str()))
 				{
 					end("OpenSSL could not set the server name");
 					return;
@@ -234,21 +258,16 @@ namespace openfeslhook::net
 				log::warning(relay::channelTopic(key_.channel), "{} #{} to {}:{} failed: {}",
 				             relay::channelName(key_.channel), key_.connection, target_.host, target_.port, problem);
 
-			close();
-			if (const std::shared_ptr<relay::Endpoint> endpoint = endpoint_.lock())
-				endpoint->close();
-			if (const std::shared_ptr<DirectRoute> route = route_.lock())
-				route->ended(key_);
+			finish();
 		}
 	};
 
 	class DirectRoute::DatagramLink final : public Link, public std::enable_shared_from_this<DatagramLink>
 	{
 	public:
-		DatagramLink(boost::asio::io_context& io, Target target, std::weak_ptr<DirectRoute> route, const Key key,
-		             std::weak_ptr<relay::Endpoint> endpoint)
-			: socket_(io), resolver_(io), target_(std::move(target)), route_(std::move(route)), key_(key),
-			  endpoint_(std::move(endpoint))
+		DatagramLink(boost::asio::io_context& io, Target target, std::weak_ptr<DirectRoute> route,
+		             const relay::ConnectionKey key, std::weak_ptr<relay::Endpoint> endpoint)
+			: Link(std::move(target), std::move(route), key, std::move(endpoint)), socket_(io), resolver_(io)
 		{
 		}
 
@@ -271,11 +290,7 @@ namespace openfeslhook::net
 					log::warning(log::Topic::Theater, "Theater datagrams cannot reach {}:{}: {}", self->target_.host,
 					             self->target_.port, connectError.message());
 					// Ending the link makes the game socket's next datagram start a new one, which tries again.
-					self->close();
-					if (const std::shared_ptr<relay::Endpoint> endpoint = self->endpoint_.lock())
-						endpoint->close();
-					if (const std::shared_ptr<DirectRoute> route = self->route_.lock())
-						route->ended(self->key_);
+					self->finish();
 					return;
 				}
 
@@ -323,15 +338,9 @@ namespace openfeslhook::net
 
 		boost::asio::ip::udp::socket socket_;
 		boost::asio::ip::udp::resolver resolver_;
-		Target target_;
-		std::string from_ = std::format("from {}:{}", target_.host, target_.port);
-		std::weak_ptr<DirectRoute> route_;
-		Key key_;
-		std::weak_ptr<relay::Endpoint> endpoint_;
 		std::deque<fesl::Packet> pending_;
 		std::array<std::uint8_t, 64 * 1024> buffer_{};
 		bool connected_ = false;
-		bool closed_ = false;
 
 		void receive()
 		{
@@ -379,18 +388,11 @@ namespace openfeslhook::net
 	std::optional<std::uint16_t> DirectRoute::attach(const relay::Channel channel, const relay::OpenBody& ports,
 	                                                 std::weak_ptr<relay::Endpoint> endpoint)
 	{
-		std::uint16_t& last = lastNumbers_.at(static_cast<std::size_t>(channel) - 1);
-		std::optional<std::uint16_t> connection;
-		for (int attempt = 0; attempt <= 0xffff && !connection; ++attempt)
-		{
-			++last;
-			if (last != 0 && !links_.contains({channel, last}))
-				connection = last;
-		}
+		const std::optional<std::uint16_t> connection = nextConnection(lastNumbers_, links_, channel);
 		if (!connection)
 			return std::nullopt;
 
-		const Key key{channel, *connection};
+		const relay::ConnectionKey key{channel, *connection};
 		std::shared_ptr<Link> link;
 		if (channel == relay::Channel::TheaterDatagram)
 			link = std::make_shared<DatagramLink>(io_, target_, weak_from_this(), key, std::move(endpoint));
@@ -426,7 +428,7 @@ namespace openfeslhook::net
 		}
 	}
 
-	void DirectRoute::ended(const Key key)
+	void DirectRoute::ended(const relay::ConnectionKey key)
 	{
 		links_.erase(key);
 	}

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <compare>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -44,14 +43,6 @@ namespace openfeslhook::relay
 		[[nodiscard]] std::shared_ptr<const RelayToken> relayToken() const;
 
 	private:
-		struct Key
-		{
-			Channel channel;
-			std::uint16_t connection;
-
-			auto operator<=>(const Key&) const = default;
-		};
-
 		boost::asio::any_io_executor executor_;
 		UpstreamFactory connect_;
 		std::shared_ptr<PresenceSink> presence_;
@@ -61,14 +52,13 @@ namespace openfeslhook::relay
 		bool upstreamOpened_ = false;
 		// Shared, since forwarders that hold it may outlive the session.
 		std::shared_ptr<RelayToken> relayToken_ = std::make_shared<RelayToken>();
-		std::map<Key, std::weak_ptr<Endpoint>> endpoints_;
+		std::map<ConnectionKey, std::weak_ptr<Endpoint>> endpoints_;
 		std::size_t streams_ = 0;
 		std::array<std::uint16_t, 3> lastNumbers_{};
 
-		std::optional<std::uint16_t> allocate(Channel channel);
 		void open();
 		void send(const Frame& frame);
-		void forget(Key key);
+		void forget(ConnectionKey key);
 		void received(std::vector<std::uint8_t> message);
 		void end(std::string_view reason);
 	};

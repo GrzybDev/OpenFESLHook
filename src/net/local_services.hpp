@@ -77,15 +77,7 @@ namespace openfeslhook::net
 		std::map<Target, std::shared_ptr<http::Forwarder>> proxyForwarders_;
 		std::thread thread_;
 
-		std::optional<std::uint16_t> listen(const Service& service, std::string_view host,
-		                                    const std::optional<Target>& forward);
 		std::shared_ptr<relay::Route> routeFor(const Service& service, const std::optional<Target>& forward);
-		std::shared_ptr<Listener> listenForFesl(const Service& service, std::string_view host,
-		                                        std::shared_ptr<relay::Route> route);
-		std::shared_ptr<Listener> listenForTheater(const Service& service, std::string_view host,
-		                                           const std::shared_ptr<relay::Route>& route);
-		std::shared_ptr<Listener> listenForHttp(const Service& service, std::string_view host,
-		                                        std::optional<Target> forward);
 		void run();
 	};
 }

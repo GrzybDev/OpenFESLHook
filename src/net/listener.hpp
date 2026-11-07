@@ -46,6 +46,18 @@ namespace openfeslhook::net
 		int value_ = 1;
 	};
 
+	/// Opens a socket and binds an address for it alone.
+	/// @param socket A TCP acceptor or a UDP socket.
+	/// @param endpoint The address and port.
+	/// @throws boost::system::system_error When the port cannot be bound or kept for the socket alone.
+	template <typename Socket>
+	void bindExclusively(Socket& socket, const typename Socket::endpoint_type& endpoint)
+	{
+		socket.open(endpoint.protocol());
+		socket.set_option(ExclusiveAddressUse());
+		socket.bind(endpoint);
+	}
+
 	/// Accepts the game's TCP connections on a loopback port and hands each one over.
 	class Listener : public std::enable_shared_from_this<Listener>
 	{

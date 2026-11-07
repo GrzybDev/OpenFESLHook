@@ -38,10 +38,7 @@ namespace openfeslhook::net
 	                                                    std::shared_ptr<relay::Route> route)
 	{
 		const std::shared_ptr<DatagramRelay> relay(new DatagramRelay(io, std::move(host), std::move(route)));
-		const boost::asio::ip::udp::endpoint endpoint(boost::asio::ip::address_v4(address), port);
-		relay->socket_.open(endpoint.protocol());
-		relay->socket_.set_option(ExclusiveAddressUse());
-		relay->socket_.bind(endpoint);
+		bindExclusively(relay->socket_, {boost::asio::ip::address_v4(address), port});
 		relay->port_ = relay->socket_.local_endpoint().port();
 		relay->receive();
 		return relay;

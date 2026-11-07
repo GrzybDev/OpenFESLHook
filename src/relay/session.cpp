@@ -28,7 +28,7 @@ namespace openfeslhook::relay
 		if (!stream && !upstream_)
 			return std::nullopt;
 
-		const std::optional<std::uint16_t> connection = allocate(channel);
+		const std::optional<std::uint16_t> connection = nextConnection(lastNumbers_, endpoints_, channel);
 		if (!connection)
 		{
 			log::warning(channelTopic(channel), "Every {} connection number is taken", channelName(channel));
@@ -38,7 +38,7 @@ namespace openfeslhook::relay
 		// Connecting comes first, so that a connection that cannot start leaves nothing registered.
 		if (!upstream_)
 			open();
-		endpoints_.emplace(Key{channel, *connection}, std::move(endpoint));
+		endpoints_.emplace(ConnectionKey{channel, *connection}, std::move(endpoint));
 		if (stream)
 			++streams_;
 
@@ -59,7 +59,7 @@ namespace openfeslhook::relay
 
 	void Session::detach(const Channel channel, const std::uint16_t connection)
 	{
-		const Key key{channel, connection};
+		const ConnectionKey key{channel, connection};
 		if (!endpoints_.contains(key))
 			return;
 
@@ -68,18 +68,6 @@ namespace openfeslhook::relay
 			end("the game closed its last connection");
 		else
 			send(closeFrame(channel, connection));
-	}
-
-	std::optional<std::uint16_t> Session::allocate(const Channel channel)
-	{
-		std::uint16_t& last = lastNumbers_.at(static_cast<std::size_t>(channel) - 1);
-		for (int attempt = 0; attempt <= 0xffff; ++attempt)
-		{
-			++last;
-			if (last != 0 && !endpoints_.contains({channel, last}))
-				return last;
-		}
-		return std::nullopt;
 	}
 
 	void Session::open()
@@ -140,7 +128,7 @@ namespace openfeslhook::relay
 		upstream_->send(encode(frame));
 	}
 
-	void Session::forget(const Key key)
+	void Session::forget(const ConnectionKey key)
 	{
 		if (endpoints_.erase(key) != 0 && isStream(key.channel))
 			--streams_;
@@ -170,7 +158,7 @@ namespace openfeslhook::relay
 			return;
 		}
 
-		const Key key{frame.channel, frame.connection};
+		const ConnectionKey key{frame.channel, frame.connection};
 		const auto found = endpoints_.find(key);
 		if (found == endpoints_.end())
 		{

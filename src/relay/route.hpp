@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <compare>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -51,6 +53,35 @@ namespace openfeslhook::relay
 		/// @param connection The connection's number.
 		virtual void detach(Channel channel, std::uint16_t connection) = 0;
 	};
+
+	/// A game connection among a route's open connections.
+	struct ConnectionKey
+	{
+		Channel channel;
+		std::uint16_t connection;
+
+		auto operator<=>(const ConnectionKey&) const = default;
+	};
+
+	/// Numbers a new connection of a channel, each channel on from the number it gave last.
+	/// @param last The last number of each channel but the session's.
+	/// @param open The open connections, by key.
+	/// @param channel The new connection's service.
+	/// @return The next number that is not 0 and that no open connection of the channel holds, or nothing when every
+	/// number is taken.
+	template <typename Connections>
+	[[nodiscard]] std::optional<std::uint16_t> nextConnection(std::array<std::uint16_t, 3>& last,
+	                                                          const Connections& open, const Channel channel)
+	{
+		std::uint16_t& number = last.at(static_cast<std::size_t>(channel) - 1);
+		for (int attempt = 0; attempt <= 0xffff; ++attempt)
+		{
+			++number;
+			if (number != 0 && !open.contains({channel, number}))
+				return number;
+		}
+		return std::nullopt;
+	}
 
 	/// Picks the log topic of a channel's connections and packets.
 	/// @param channel The channel.
