@@ -96,16 +96,11 @@ namespace openfeslhook::launcher
 					// A body that is not JSON leaves the fields empty, so the status alone decides the outcome.
 				}
 
-				if (answer.status == 200)
-				{
-					Session session{.sessionId = body.get<std::string>("sessionId", ""),
-					                .accountName = body.get<std::string>("accountName", ""),
-					                .soldierName = body.get<std::string>("personaName", "")};
-					if (session.sessionId.empty())
-						result.refusal = body.get<std::string>("error", "");
-					else
-						result.session = std::move(session);
-				}
+				Session session{.sessionId = body.get<std::string>("sessionId", ""),
+				                .accountName = body.get<std::string>("accountName", ""),
+				                .soldierName = body.get<std::string>("personaName", "")};
+				if (answer.status == 200 && !session.sessionId.empty())
+					result.session = std::move(session);
 				else
 					result.refusal = body.get<std::string>("error", "");
 			}

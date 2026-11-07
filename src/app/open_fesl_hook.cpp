@@ -92,6 +92,11 @@ namespace openfeslhook::app
 	{
 		std::vector<std::string> problems;
 		std::optional<std::string> failure;
+		const auto report = [&problems](const std::exception& problem, const std::string_view consequence)
+		{
+			problems.push_back(std::format("{}; {}", problem.what(), consequence));
+			log::warning(log::Topic::Hook, "{}", problems.back());
+		};
 		try
 		{
 			// Starting Winsock is left to this thread, since Asio would otherwise start it under the loader lock.
@@ -139,11 +144,8 @@ namespace openfeslhook::app
 				{
 					// Without the detour, failed connections to the relay server say nothing about IPv4.
 					ipv4->turnOff();
-					problems.push_back(std::format("{}; the relay server's host name is looked up for every address "
-					                               "family, so the server may see an IPv6 address instead of this PC's "
-					                               "IPv4 address",
-					                               problem.what()));
-					log::warning(log::Topic::Hook, "{}", problems.back());
+					report(problem, "the relay server's host name is looked up for every address family, so the server "
+					                "may see an IPv6 address instead of this PC's IPv4 address");
 				}
 			}
 			net::LocalServices* const services = startServices(settings.server, *ipv4, settings.discordPresence);
@@ -176,10 +178,7 @@ namespace openfeslhook::app
 				}
 				catch (const std::exception& problem)
 				{
-					problems.push_back(std::format("{}; a game that reaches its account or store over WinHTTP will not "
-					                                "get through",
-					                                problem.what()));
-					log::warning(log::Topic::Hook, "{}", problems.back());
+					report(problem, "a game that reaches its account or store over WinHTTP will not get through");
 				}
 			}
 
@@ -195,9 +194,7 @@ namespace openfeslhook::app
 			}
 			catch (const std::exception& problem)
 			{
-				problems.push_back(std::format("{}; pages the game opens in the browser go to their original sites",
-				                               problem.what()));
-				log::warning(log::Topic::Hook, "{}", problems.back());
+				report(problem, "pages the game opens in the browser go to their original sites");
 			}
 		}
 		catch (const std::exception& problem)
