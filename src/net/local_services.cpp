@@ -4,7 +4,6 @@
 #include "logging/log.hpp"
 #include "net/datagram_relay.hpp"
 #include "net/http_connection.hpp"
-#include "net/proxy_connection.hpp"
 #include "net/stream_connection.hpp"
 #include "tls/game_tls.hpp"
 #include "tls/proxy_tls.hpp"
@@ -71,7 +70,7 @@ namespace openfeslhook::net
 				Listener::start(io_, service, "the WinHTTP proxy",
 			                    [forwarders = std::move(forwarders), tls](boost::asio::ip::tcp::socket socket)
 			{
-				std::make_shared<ProxyConnection>(std::move(socket), forwarders, tls)->start();
+				serveProxy(std::move(socket), forwarders, tls);
 			});
 			proxyPort_ = listener->port();
 			log::info(log::Topic::Http, "Listening for {}", listener->description());
@@ -196,7 +195,7 @@ namespace openfeslhook::net
 		return Listener::start(io_, service, host,
 		                       [forwarder = std::move(forwarder)](boost::asio::ip::tcp::socket socket)
 		{
-			std::make_shared<HttpConnection>(std::move(socket), forwarder)->start();
+			serveHttp(std::move(socket), forwarder);
 		});
 	}
 
