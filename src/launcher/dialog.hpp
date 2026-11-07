@@ -38,8 +38,8 @@ namespace openfeslhook::launcher
 	{
 		Mode mode = Mode::Play;
 		Session session;
+		/// The account the player entered; empty for a server, which signs in with the relay server's own account.
 		std::string account;
-		std::string password;
 		/// The game's `+lang` code, or empty for the system's language.
 		std::string language;
 		std::string map;

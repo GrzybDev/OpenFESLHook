@@ -74,8 +74,8 @@ namespace openfeslhook::launcher
 			return answer;
 		}
 
-		// Sends a launcher request and reads the session or the refusal from the answer; the soldier is the account's
-		// name when the server names none.
+		// Sends a launcher request and reads the session or the refusal from the answer; the account and the soldier are
+		// the entered account's name when the server names none.
 		SessionResult ask(const relay::ServerAddress& server, const pt::ptree& request, const std::string_view account)
 		{
 			SessionResult result;
@@ -100,6 +100,7 @@ namespace openfeslhook::launcher
 				if (answer.status == 200)
 				{
 					Session session{.sessionId = body.get<std::string>("sessionId", ""),
+					                .accountName = body.get<std::string>("accountName", std::string(account)),
 					                .soldierName = body.get<std::string>("personaName", std::string(account))};
 					if (session.sessionId.empty())
 						result.refusal = body.get<std::string>("error", "");
@@ -124,15 +125,23 @@ namespace openfeslhook::launcher
 		}
 	}
 
-	SessionResult requestSession(const relay::ServerAddress& server, const bool host, const std::string_view account,
+	SessionResult requestSession(const relay::ServerAddress& server, const std::string_view account,
 	                             const std::string_view password)
 	{
 		pt::ptree request;
 		request.put("game", "bfheroes");
-		request.put("role", host ? "host" : "play");
+		request.put("role", "play");
 		request.put("account", std::string(account));
 		request.put("password", std::string(password));
 		return ask(server, request, account);
+	}
+
+	SessionResult requestHostSession(const relay::ServerAddress& server)
+	{
+		pt::ptree request;
+		request.put("game", "bfheroes");
+		request.put("role", "host");
+		return ask(server, request, {});
 	}
 
 	SessionResult requestLinkSession(const relay::ServerAddress& server, const std::string_view code)

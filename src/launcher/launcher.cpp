@@ -71,10 +71,13 @@ namespace openfeslhook::launcher
 			std::error_code error;
 			std::filesystem::create_directories(file.parent_path(), error);
 			const std::wstring path = file.wstring();
-			// The password is deliberately not stored.
+			// The password is deliberately not stored, and a server, which enters no account, keeps the one remembered
+			// for playing.
 			WritePrivateProfileStringW(L"Launcher", L"Remember", L"1", path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Mode", choice.mode == Mode::Host ? L"host" : L"play", path.c_str());
-			WritePrivateProfileStringW(L"Launcher", L"Account", platform::widen(choice.account).c_str(), path.c_str());
+			if (choice.mode == Mode::Play)
+				WritePrivateProfileStringW(L"Launcher", L"Account", platform::widen(choice.account).c_str(),
+				                           path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Language", platform::widen(choice.language).c_str(), path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Map", platform::widen(choice.map).c_str(), path.c_str());
 			WritePrivateProfileStringW(L"Launcher", L"Ranked", choice.ranked ? L"1" : L"0", path.c_str());
@@ -168,8 +171,8 @@ namespace openfeslhook::launcher
 			std::vector<std::wstring> arguments;
 			if (choice.mode == Mode::Host)
 			{
-				const std::wstring soldier =
-					platform::widen(choice.session.soldierName.empty() ? choice.account : choice.session.soldierName);
+				// The game never signs in with an account name and password (its account login is empty, BFHeroes.exe
+				// 1.89 at 0x004b6e5b) but with the session, so the password is a placeholder.
 				arguments = {L"+dedicated",
 				             L"1",
 				             L"+sessionId",
@@ -178,11 +181,11 @@ namespace openfeslhook::launcher
 				             L"+autoLogin",
 				             L"1",
 				             L"+eaAccountName",
-				             platform::widen(choice.account),
+				             platform::widen(choice.session.accountName),
 				             L"+eaAccountPassword",
-				             platform::widen(choice.password),
+				             L"unused",
 				             L"+soldierName",
-				             soldier};
+				             platform::widen(choice.session.soldierName)};
 				// The game takes +ranked as a switch, whatever its value, so an unranked server is started without it.
 				if (choice.ranked)
 				{

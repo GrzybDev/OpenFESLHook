@@ -55,6 +55,7 @@ namespace openfeslhook::launcher
 			HWND dialog = nullptr;
 			relay::ServerAddress server;
 			bool host = false;
+			// The account and password the player entered to play; empty for a server and for a website link.
 			std::string account;
 			std::string password;
 			// The code of the website link to sign in with in place of the account and password; empty for those.
@@ -143,9 +144,11 @@ namespace openfeslhook::launcher
 		{
 			const bool host = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED;
 			setText(state, dialog, IDOK, host ? "launcher.button.host" : "launcher.button.play");
-			const int show = host ? SW_SHOW : SW_HIDE;
 			for (const int control : {IDC_MAP_LABEL, IDC_MAP, IDC_RANKED})
-				ShowWindow(GetDlgItem(dialog, control), show);
+				ShowWindow(GetDlgItem(dialog, control), host ? SW_SHOW : SW_HIDE);
+			// A server signs in with the relay server's shared server account, so it needs no account of the player's.
+			for (const int control : {IDC_ACCOUNT_LABEL, IDC_ACCOUNT, IDC_PASSWORD_LABEL, IDC_PASSWORD})
+				ShowWindow(GetDlgItem(dialog, control), host ? SW_HIDE : SW_SHOW);
 		}
 
 		// Cancel is left out: it stays usable during a sign-in, whose answer then goes nowhere. The website-link option
@@ -276,15 +279,25 @@ namespace openfeslhook::launcher
 			setText(state, dialog, IDC_STATUS, status);
 			runOnWorker(kSignedIn, std::move(request), [](SignInJob& job)
 			{
-				job.result = job.code.empty() ? requestSession(job.server, job.host, job.account, job.password)
-				                              : requestLinkSession(job.server, job.code);
+				if (!job.code.empty())
+					job.result = requestLinkSession(job.server, job.code);
+				else if (job.host)
+					job.result = requestHostSession(job.server);
+				else
+					job.result = requestSession(job.server, job.account, job.password);
 			});
 		}
 
-		void signInWithPassword(State& state, const HWND dialog)
+		void signInWithForm(State& state, const HWND dialog)
 		{
 			if (state.busy)
 				return;
+			if (IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED)
+			{
+				startSignIn(state, dialog, {.dialog = dialog, .server = *state.server, .host = true},
+				            "launcher.status.signing_in");
+				return;
+			}
 			const std::wstring account = windowText(GetDlgItem(dialog, IDC_ACCOUNT));
 			const std::wstring password = windowText(GetDlgItem(dialog, IDC_PASSWORD));
 			if (account.empty() || password.empty())
@@ -296,7 +309,6 @@ namespace openfeslhook::launcher
 			startSignIn(state, dialog,
 			            {.dialog = dialog,
 			             .server = *state.server,
-			             .host = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED,
 			             .account = platform::narrow(account),
 			             .password = platform::narrow(password)},
 			            "launcher.status.signing_in");
@@ -338,7 +350,6 @@ namespace openfeslhook::launcher
 			choice.mode = host ? Mode::Host : Mode::Play;
 			choice.session = *job.result.session;
 			choice.account = job.account;
-			choice.password = job.password;
 			choice.language = languageCode(dialog);
 			// The first map item means "leave it to the server's map list", which the launch passes as no map at all.
 			const LRESULT mapIndex = SendDlgItemMessageW(dialog, IDC_MAP, CB_GETCURSEL, 0, 0);
@@ -383,7 +394,10 @@ namespace openfeslhook::launcher
 				SetWindowLongPtrW(dialog, GWLP_USERDATA, static_cast<LONG_PTR>(lParam));
 				applyModernFrame(dialog);
 				prefill(*initial, dialog);
-				SetFocus(GetDlgItem(dialog, initial->defaults->account.empty() ? IDC_ACCOUNT : IDC_PASSWORD));
+				const int focus = IsDlgButtonChecked(dialog, IDC_MODE_HOST) == BST_CHECKED ? IDOK
+				                  : initial->defaults->account.empty()                     ? IDC_ACCOUNT
+				                                                                           : IDC_PASSWORD;
+				SetFocus(GetDlgItem(dialog, focus));
 				signInWithLink(*initial, dialog);
 				return FALSE; // the focus was set here
 			}
@@ -402,7 +416,7 @@ namespace openfeslhook::launcher
 						                                                                : LinksChange::Remove);
 					return TRUE;
 				case IDOK:
-					signInWithPassword(*state, dialog);
+					signInWithForm(*state, dialog);
 					return TRUE;
 				case IDCANCEL:
 					EndDialog(dialog, IDCANCEL);

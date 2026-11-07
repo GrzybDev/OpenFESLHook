@@ -8,10 +8,11 @@
 
 namespace openfeslhook::launcher
 {
-	/// A session the relay server grants: the token the game is launched with and the soldier it names.
+	/// A session the relay server grants: the token the game is launched with, and the account and soldier it names.
 	struct Session
 	{
 		std::string sessionId;
+		std::string accountName;
 		std::string soldierName;
 	};
 
@@ -28,14 +29,18 @@ namespace openfeslhook::launcher
 		bool unreachable = false;
 	};
 
-	/// Asks the relay server for a session for an account, over the server's HTTP(S) address, so that the game can be
-	/// launched with it. Waits for the answer.
+	/// Asks the relay server for a session to play with an account, over the server's HTTP(S) address, so that the game
+	/// can be launched with it. Waits for the answer.
 	/// @param server The relay server, whose scheme, host and port the request follows.
-	/// @param host Whether the session is for hosting a server rather than for playing.
 	/// @param account The account name the player entered.
 	/// @param password The password the player entered.
-	[[nodiscard]] SessionResult requestSession(const relay::ServerAddress& server, bool host,
-	                                            std::string_view account, std::string_view password);
+	[[nodiscard]] SessionResult requestSession(const relay::ServerAddress& server, std::string_view account,
+	                                            std::string_view password);
+
+	/// Asks the relay server for the session of its shared server account, over the server's HTTP(S) address, so that
+	/// a dedicated server can be launched with it. Waits for the answer.
+	/// @param server The relay server, whose scheme, host and port the request follows.
+	[[nodiscard]] SessionResult requestHostSession(const relay::ServerAddress& server);
 
 	/// Trades the one-time code of a website link for a session to play, over the relay server's HTTP(S) address.
 	/// Waits for the answer.
