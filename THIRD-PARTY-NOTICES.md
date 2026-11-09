@@ -4,8 +4,8 @@ OpenFESLHook contains libraries made by other people and companies. This file li
 with the hook's dinput8.dll, gives its licence and copyright, and contains the licence texts that have to accompany the
 hook.
 
-The hook's own source code is licensed under the GNU Lesser General Public License, version 3. That licence does not
-cover the components below, each of which is under its own licence only.
+The hook's own source code is licensed under the GNU Lesser General Public License, version 3 or (at your option) any
+later version. That licence does not cover the components below, each of which is under its own licence only.
 
 Licence texts are reproduced as their authors published them; only line endings and trailing spaces were normalised.
 
